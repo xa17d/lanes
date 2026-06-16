@@ -2,28 +2,34 @@
 //  RootView.swift
 //  lane
 //
-//  The launcher shell: search field on top, content below. Phase 2 wires the
-//  chrome (autofocus, sizing, material); navigation + data arrive in Phase 5.
+//  The launcher shell: search field, breadcrumb, level list, footer, and a
+//  transient toast. Keyboard handling lives in the panel (NSEvent monitor) and
+//  is routed into LaneModel.
 //
 
 import SwiftUI
 
 struct RootView: View {
-    let onClose: () -> Void
-
-    @State private var query: String = ""
+    @ObservedObject var model: LaneModel
     @FocusState private var searchFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             searchField
             Divider().opacity(0.4)
-            content
-            footer
+            Breadcrumb(labels: model.breadcrumb)
+            LevelView(model: model)
+            Footer(hint: hint)
         }
         .frame(width: Tokens.Size.panelWidth)
         .background(VisualEffectBackground(material: .popover))
         .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.panel, style: .continuous))
+        .overlay(alignment: .bottom) {
+            if let toast = model.toast {
+                ToastView(state: toast)
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: model.toast)
         .onAppear { searchFocused = true }
     }
 
@@ -32,7 +38,7 @@ struct RootView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 18))
                 .foregroundStyle(.secondary)
-            TextField("Search tracks…", text: $query)
+            TextField(searchPrompt, text: $model.query)
                 .textFieldStyle(.plain)
                 .font(Tokens.Font.search)
                 .focused($searchFocused)
@@ -41,30 +47,15 @@ struct RootView: View {
         .frame(height: Tokens.Size.searchHeight)
     }
 
-    private var content: some View {
-        VStack(spacing: Tokens.Space.s) {
-            Image(systemName: "road.lanes")
-                .font(.system(size: 30))
-                .foregroundStyle(.tint)
-            Text("Launcher shell")
-                .font(.headline)
-            Text("Navigation and tracks arrive in a later phase.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 220)
+    private var searchPrompt: String {
+        if model.stack.isEmpty { return "Search tracks…" }
+        return "Search \(model.currentTrack?.name ?? "")…"
     }
 
-    private var footer: some View {
-        HStack {
-            Text("↑↓ navigate · ↵ open · esc close")
-                .font(Tokens.Font.footer)
-                .foregroundStyle(.tertiary)
-            Spacer()
+    private var hint: String {
+        if model.stack.isEmpty {
+            return "↑↓ navigate · ↵ open · esc close"
         }
-        .padding(.horizontal, Tokens.Space.l)
-        .frame(height: Tokens.Size.footerHeight)
-        .background(.quaternary.opacity(0.3))
+        return "↑↓ navigate · ↵ open · → drill in · esc back"
     }
 }

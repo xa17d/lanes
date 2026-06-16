@@ -2,9 +2,9 @@
 //  PanelController.swift
 //  lane
 //
-//  Owns the floating launcher NSPanel: a borderless, non-activating panel with
-//  a native material background that sizes itself to the SwiftUI content and
-//  hides on Esc or click-away.
+//  Owns the floating launcher NSPanel and the keyboard handling. Keys are
+//  intercepted with a local NSEvent monitor (so the search field keeps text
+//  input while ↑↓↵→←/esc drive navigation) and routed into LaneModel.
 //
 
 import AppKit
@@ -12,7 +12,14 @@ import SwiftUI
 
 @MainActor
 final class PanelController {
+    private let model: LaneModel
     private var panel: LanePanel?
+    private var keyMonitor: Any?
+
+    init(model: LaneModel) {
+        self.model = model
+        model.onClose = { [weak self] in self?.hide() }
+    }
 
     func toggle() {
         if panel?.isVisible == true {
@@ -25,6 +32,8 @@ final class PanelController {
     func show() {
         let panel = self.panel ?? makePanel()
         self.panel = panel
+        model.reset()
+        installKeyMonitor()
         positionOnActiveScreen(panel)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
@@ -51,14 +60,47 @@ final class PanelController {
         panel.hasShadow = true
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.onCancel = { [weak self] in self?.hide() }
+        panel.onCancel = { [weak self] in self?.model.escape() }
         panel.onResignKey = { [weak self] in self?.hide() }
-
-        // contentViewController + NSHostingController makes the window size
-        // itself to the SwiftUI content's fitting size.
-        let root = RootView(onClose: { [weak self] in self?.hide() })
-        panel.contentViewController = NSHostingController(rootView: root)
+        panel.contentViewController = NSHostingController(rootView: RootView(model: model))
         return panel
+    }
+
+    // MARK: - Keyboard
+
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            return self.handle(event) ? nil : event
+        }
+    }
+
+    private func handle(_ event: NSEvent) -> Bool {
+        guard panel?.isKeyWindow == true else { return false }
+
+        if event.modifierFlags.contains(.command) {
+            switch event.charactersIgnoringModifiers {
+            case "r": model.reloadCurrent(); return true
+            case ",": model.onOpenSettings(); return true
+            default: return false
+            }
+        }
+
+        switch event.keyCode {
+        case 125: model.moveSelection(1);  return true   // ↓
+        case 126: model.moveSelection(-1); return true   // ↑
+        case 36, 76: model.activateSelected(); return true  // return / enter
+        case 53: model.escape(); return true             // esc
+        case 124:                                        // → drill in (when not editing text)
+            if model.query.isEmpty { model.drillRight(); return true }
+            return false
+        case 123:                                        // ← pop (when not editing text)
+            if model.query.isEmpty { model.pop(); return true }
+            return false
+        default:
+            return false
+        }
     }
 
     // MARK: - Placement
@@ -70,7 +112,6 @@ final class PanelController {
         let visible = screen.visibleFrame
         let size = panel.frame.size
         let x = visible.midX - size.width / 2
-        // Sit slightly above center, launcher-style.
         let y = visible.midY - size.height / 2 + visible.height * 0.12
         panel.setFrameOrigin(NSPoint(x: x, y: y))
     }

@@ -25,4 +25,16 @@ final class LanePanel: NSPanel {
         super.resignKey()
         onResignKey?()
     }
+
+    /// Keep the top edge fixed as the content height changes (the list grows
+    /// downward instead of the whole panel jumping upward).
+    override func setContentSize(_ size: NSSize) {
+        let oldTop = frame.maxY
+        super.setContentSize(size)
+        if isVisible {
+            var origin = frame.origin
+            origin.y = oldTop - frame.height
+            setFrameOrigin(origin)
+        }
+    }
 }
