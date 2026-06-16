@@ -1,0 +1,46 @@
+//
+//  Item.swift
+//  lane
+//
+//  The one universal node. Optional `run` (leaf = action) and `children()`
+//  (container). A provider owns its entire subtree.
+//
+
+import Foundation
+
+nonisolated enum RunOutcome: Sendable {
+    case dismiss   // close the panel (most launch actions)
+    case stay      // keep panel open (e.g. after a refresh)
+    case pop       // pop one level (e.g. after creating an item)
+}
+
+protocol Item: Identifiable, Sendable {
+    nonisolated var id: String { get }                        // stable, namespaced
+    nonisolated var title: String { get }
+    nonisolated var subtitle: String? { get }
+    nonisolated var icon: IconToken { get }
+    nonisolated var keywords: [String] { get }
+    nonisolated var run: (@Sendable () async throws -> RunOutcome)? { get }
+    nonisolated func children() async -> [any Item]
+}
+
+extension Item {
+    var subtitle: String? { nil }
+    var icon: IconToken { .generic }
+    var keywords: [String] { [] }
+    var run: (@Sendable () async throws -> RunOutcome)? { nil }
+    func children() async -> [any Item] { [] }
+}
+
+/// The one concrete type providers construct.
+nonisolated struct BasicItem: Item {
+    let id: String
+    var title: String
+    var subtitle: String? = nil
+    var icon: IconToken = .generic
+    var keywords: [String] = []
+    var run: (@Sendable () async throws -> RunOutcome)? = nil
+    var childrenProvider: @Sendable () async -> [any Item] = { [] }
+
+    func children() async -> [any Item] { await childrenProvider() }
+}
