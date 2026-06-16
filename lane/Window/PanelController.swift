@@ -83,6 +83,17 @@ final class PanelController {
             switch event.charactersIgnoringModifiers {
             case "r": model.reloadCurrent(); return true
             case ",": model.onOpenSettings(); return true
+            case "n" where model.stack.isEmpty: model.newTrack(); return true
+            default: return false
+            }
+        }
+
+        // In input mode only confirm/cancel are intercepted; everything else
+        // (incl. arrows for cursor movement) edits the text field.
+        if model.isInputMode {
+            switch event.keyCode {
+            case 36, 76: model.confirm(); return true
+            case 53: model.escape(); return true
             default: return false
             }
         }
@@ -90,7 +101,7 @@ final class PanelController {
         switch event.keyCode {
         case 125: model.moveSelection(1);  return true   // ↓
         case 126: model.moveSelection(-1); return true   // ↑
-        case 36, 76: model.activateSelected(); return true  // return / enter
+        case 36, 76: model.confirm(); return true        // return / enter
         case 53: model.escape(); return true             // esc
         case 124:                                        // → drill in (when not editing text)
             if model.query.isEmpty { model.drillRight(); return true }

@@ -21,6 +21,7 @@ final class LaneModel: ObservableObject {
     @Published var tracks: [Track] = []
     @Published var stack: [LevelState] = []
     @Published var query: String = "" { didSet { selection = 0 } }
+    @Published var inputText: String = ""
     @Published var selection: Int = 0
     @Published var toast: ToastState?
     @Published var includeArchived = false
@@ -50,9 +51,20 @@ final class LaneModel: ObservableObject {
 
     var breadcrumb: [String] { stack.compactMap(\.titleSegment) }
 
+    var isInputMode: Bool {
+        if case .input = currentLevel?.kind { return true }
+        return false
+    }
+
+    var currentInputRequest: InputRequest? {
+        if case .input(let request)? = currentLevel?.kind { return request }
+        return nil
+    }
+
     // MARK: - Rows
 
     var rows: [DisplayRow] {
+        if isInputMode { return [] }
         if stack.isEmpty {
             return trackRows()
         } else {
@@ -72,11 +84,16 @@ final class LaneModel: ObservableObject {
                 .sorted { $0.1 > $1.1 }
                 .map(\.0)
         }
-        return matched.map { t in
+        var rows = matched.map { t in
             DisplayRow(id: "track:\(t.id)", title: t.name,
                        subtitle: t.isArchived ? "archived" : nil,
                        icon: .folder, pathLabels: [], payload: .track(t))
         }
+        // "New track…" is always last.
+        if let root = library.root {
+            rows.append(DisplayRow(item: TrackActions.newTrackItem(root: root), pathLabels: []))
+        }
+        return rows
     }
 
     private func itemRows(for level: LevelState) -> [DisplayRow] {
@@ -101,6 +118,12 @@ final class LaneModel: ObservableObject {
         selection = min(max(selection + delta, 0), count - 1)
     }
 
+    /// Return / Enter. Submits in input mode, else activates the selection.
+    func confirm() {
+        if isInputMode { submitInput(); return }
+        activateSelected()
+    }
+
     func activateSelected() {
         guard let row = selectedRow else { return }
         switch row.payload {
@@ -109,24 +132,39 @@ final class LaneModel: ObservableObject {
         }
     }
 
-    /// Right arrow: drill into containers / track-management. For items this
-    /// matches Return; track-management menu arrives in Phase 7.
+    /// Right arrow: enter containers, or reveal the track-management menu.
     func drillRight() {
         guard let row = selectedRow else { return }
         switch row.payload {
-        case .track(let t): enter(track: t)
+        case .track(let t): showManagement(for: t)
         case .item(let item): activate(item: item)
         }
     }
 
     func escape() {
-        if !query.isEmpty {
+        if isInputMode {
+            pop()                       // cancel input
+        } else if !query.isEmpty {
             query = ""
         } else if stack.isEmpty {
             onClose()
         } else {
             pop()
         }
+    }
+
+    func newTrack() {
+        guard let root = library.root else {
+            showToast("Set a root folder in Settings (⌘,) first.", kind: .error)
+            return
+        }
+        pushInput(TrackActions.newTrackRequest(root: root))
+    }
+
+    private func showManagement(for track: Track) {
+        guard let root = library.root else { return }
+        let items = TrackActions.managementItems(for: track, root: root, apps: services.apps)
+        pushItems(title: track.name, items: items)
     }
 
     func pop() {
@@ -151,25 +189,65 @@ final class LaneModel: ObservableObject {
 
     private func activate(item: any Item) {
         if let run = item.run {
-            runLeaf(run)
+            Task {
+                do { honor(try await run()) }
+                catch { showToast(error.localizedDescription, kind: .error) }
+            }
         } else {
             push(item: item)
         }
     }
 
-    private func runLeaf(_ run: @escaping @Sendable () async throws -> RunOutcome) {
+    private func submitInput() {
+        guard let request = currentInputRequest else { return }
+        let text = inputText
         Task {
-            do {
-                let outcome = try await run()
-                switch outcome {
-                case .dismiss: onClose()
-                case .pop: pop()
-                case .stay: break
-                }
-            } catch {
-                showToast(error.localizedDescription, kind: .error)
-            }
+            do { honor(try await request.onSubmit(text)) }
+            catch { showToast(error.localizedDescription, kind: .error) }
         }
+    }
+
+    private func honor(_ outcome: RunOutcome) {
+        switch outcome {
+        case .dismiss:
+            onClose()
+        case .stay:
+            break
+        case .pop:
+            pop()
+            reloadCurrent()
+        case .popToRoot:
+            stack = []
+            query = ""
+            selection = 0
+            reloadTracks()
+        case .enter(let track):
+            enter(track: track)
+        case .pushInput(let request):
+            pushInput(request)
+        case .pushItems(let title, let items):
+            pushItems(title: title, items: items)
+        }
+    }
+
+    private func pushInput(_ request: InputRequest) {
+        var level = LevelState(kind: .input(request), titleSegment: request.title)
+        level.track = currentTrack
+        stack.append(level)
+        inputText = request.initialText
+        query = ""
+        selection = 0
+    }
+
+    private func pushItems(title: String, items: [any Item]) {
+        var level = LevelState(kind: .items, titleSegment: title)
+        level.track = currentTrack
+        level.items = items
+        stack.append(level)
+        query = ""
+        selection = 0
+        let levelID = level.id
+        Task { await buildIndex(levelID: levelID, token: level.loadToken) }
     }
 
     // MARK: - Navigation
@@ -276,7 +354,7 @@ final class LaneModel: ObservableObject {
 
 struct LevelState: Identifiable {
     let id = UUID()
-    enum Kind { case items }
+    enum Kind { case items; case input(InputRequest) }
     let kind: Kind
     let titleSegment: String?
 

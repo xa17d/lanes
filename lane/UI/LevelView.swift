@@ -14,7 +14,9 @@ struct LevelView: View {
     var body: some View {
         let rows = model.rows
         Group {
-            if rows.isEmpty {
+            if model.isInputMode {
+                inputHint
+            } else if rows.isEmpty {
                 if isLoading {
                     shimmer
                 } else {
@@ -70,6 +72,19 @@ struct LevelView: View {
                 .redacted(reason: .placeholder)
             }
         }
+    }
+
+    private var inputHint: some View {
+        VStack(spacing: Tokens.Space.s) {
+            Image(systemName: "return")
+                .font(.system(size: 22))
+                .foregroundStyle(.secondary)
+            Text(model.currentInputRequest?.title ?? "")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 36)
     }
 
     private var emptyState: some View {

@@ -35,10 +35,10 @@ struct RootView: View {
 
     private var searchField: some View {
         HStack(spacing: Tokens.Space.m) {
-            Image(systemName: "magnifyingglass")
+            Image(systemName: model.isInputMode ? "pencil" : "magnifyingglass")
                 .font(.system(size: 18))
                 .foregroundStyle(.secondary)
-            TextField(searchPrompt, text: $model.query)
+            TextField(fieldPrompt, text: model.isInputMode ? $model.inputText : $model.query)
                 .textFieldStyle(.plain)
                 .font(Tokens.Font.search)
                 .focused($searchFocused)
@@ -47,14 +47,18 @@ struct RootView: View {
         .frame(height: Tokens.Size.searchHeight)
     }
 
-    private var searchPrompt: String {
+    private var fieldPrompt: String {
+        if let request = model.currentInputRequest { return request.placeholder }
         if model.stack.isEmpty { return "Search tracks…" }
         return "Search \(model.currentTrack?.name ?? "")…"
     }
 
     private var hint: String {
+        if model.isInputMode {
+            return "↵ confirm · esc cancel"
+        }
         if model.stack.isEmpty {
-            return "↑↓ navigate · ↵ open · esc close"
+            return "↑↓ navigate · ↵ open · → manage · ⌘N new · esc close"
         }
         return "↑↓ navigate · ↵ open · → drill in · esc back"
     }
