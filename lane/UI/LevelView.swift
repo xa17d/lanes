@@ -10,6 +10,7 @@ import SwiftUI
 
 struct LevelView: View {
     @ObservedObject var model: LaneModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let rows = model.rows
@@ -51,8 +52,12 @@ struct LevelView: View {
             .frame(maxHeight: Tokens.Size.panelMaxHeight)
             .fixedSize(horizontal: false, vertical: true)
             .onChange(of: model.selection) { _, newValue in
-                withAnimation(.easeOut(duration: 0.12)) {
+                if reduceMotion {
                     proxy.scrollTo(newValue, anchor: .center)
+                } else {
+                    withAnimation(.easeOut(duration: 0.12)) {
+                        proxy.scrollTo(newValue, anchor: .center)
+                    }
                 }
             }
         }

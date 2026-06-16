@@ -25,6 +25,7 @@ final class LaneModel: ObservableObject {
     @Published var selection: Int = 0
     @Published var toast: ToastState?
     @Published var includeArchived = false
+    @Published var panelAppeared = false
 
     init(library: TrackLibrary, services: Services, registry: ProviderRegistry) {
         self.library = library
@@ -44,6 +45,14 @@ final class LaneModel: ObservableObject {
 
     func reloadTracks() {
         tracks = library.tracks(includeArchived: includeArchived)
+    }
+
+    /// Toggle archived tracks in the level-0 list (so they can be unarchived).
+    func toggleArchived() {
+        guard stack.isEmpty else { return }
+        includeArchived.toggle()
+        selection = 0
+        reloadTracks()
     }
 
     var currentLevel: LevelState? { stack.last }

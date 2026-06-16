@@ -12,6 +12,7 @@ import SwiftUI
 struct RootView: View {
     @ObservedObject var model: LaneModel
     @FocusState private var searchFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -30,7 +31,14 @@ struct RootView: View {
             }
         }
         .animation(.easeOut(duration: 0.18), value: model.toast)
+        // Show motion: cross-fade always; subtle scale unless Reduce Motion.
+        .scaleEffect(reduceMotion ? 1 : (model.panelAppeared ? 1 : 0.98))
+        .opacity(model.panelAppeared ? 1 : 0)
+        .animation(.easeOut(duration: 0.14), value: model.panelAppeared)
         .onAppear { searchFocused = true }
+        .onChange(of: model.panelAppeared) { _, appeared in
+            if appeared { searchFocused = true }
+        }
     }
 
     private var searchField: some View {
@@ -58,7 +66,8 @@ struct RootView: View {
             return "↵ confirm · esc cancel"
         }
         if model.stack.isEmpty {
-            return "↑↓ navigate · ↵ open · → manage · ⌘N new · esc close"
+            let base = "↑↓ navigate · ↵ open · → manage · ⌘N new · ⌘⇧A archived"
+            return model.includeArchived ? base + " (shown)" : base
         }
         return "↑↓ navigate · ↵ open · → drill in · esc back"
     }

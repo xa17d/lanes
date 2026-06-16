@@ -33,13 +33,17 @@ final class PanelController {
         let panel = self.panel ?? makePanel()
         self.panel = panel
         model.reset()
+        model.panelAppeared = false
         installKeyMonitor()
         positionOnActiveScreen(panel)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+        // Drive the fade/scale-in (RootView animates on panelAppeared).
+        DispatchQueue.main.async { [weak self] in self?.model.panelAppeared = true }
     }
 
     func hide() {
+        model.panelAppeared = false
         panel?.orderOut(nil)
     }
 
@@ -84,6 +88,7 @@ final class PanelController {
             case "r": model.reloadCurrent(); return true
             case ",": model.onOpenSettings(); return true
             case "n" where model.stack.isEmpty: model.newTrack(); return true
+            case "A" where model.stack.isEmpty: model.toggleArchived(); return true
             default: return false
             }
         }
