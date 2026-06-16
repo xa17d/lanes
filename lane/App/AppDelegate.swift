@@ -25,6 +25,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyUp(for: .toggleLane) { [weak self] in
             self?.panel.toggle()
         }
+
+        // Debug aid: LANE_AUTOSHOW=1 shows the panel on launch (used for
+        // headless smoke tests). Inert without the env var.
+        if ProcessInfo.processInfo.environment["LANE_AUTOSHOW"] == "1" {
+            panel.show()
+        }
     }
 
     static func openSettings() {

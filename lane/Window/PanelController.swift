@@ -2,8 +2,9 @@
 //  PanelController.swift
 //  lane
 //
-//  Owns the floating launcher NSPanel. Phase 1: a minimal placeholder panel
-//  that the hotkey/status item can toggle. Expanded in Phase 2.
+//  Owns the floating launcher NSPanel: a borderless, non-activating panel with
+//  a native material background that sizes itself to the SwiftUI content and
+//  hides on Esc or click-away.
 //
 
 import AppKit
@@ -11,10 +12,10 @@ import SwiftUI
 
 @MainActor
 final class PanelController {
-    private var panel: NSPanel?
+    private var panel: LanePanel?
 
     func toggle() {
-        if let panel, panel.isVisible {
+        if panel?.isVisible == true {
             hide()
         } else {
             show()
@@ -33,21 +34,11 @@ final class PanelController {
         panel?.orderOut(nil)
     }
 
-    private func positionOnActiveScreen(_ panel: NSPanel) {
-        let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) })
-            ?? NSScreen.main
-        guard let screen else { return }
-        let visible = screen.visibleFrame
-        let size = panel.frame.size
-        let x = visible.midX - size.width / 2
-        // Sit slightly above center, launcher-style.
-        let y = visible.midY - size.height / 2 + visible.height * 0.12
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
-    }
+    // MARK: - Construction
 
-    private func makePanel() -> NSPanel {
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 120),
+    private func makePanel() -> LanePanel {
+        let panel = LanePanel(
+            contentRect: NSRect(x: 0, y: 0, width: Tokens.Size.panelWidth, height: 320),
             styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
@@ -58,25 +49,29 @@ final class PanelController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.contentView = NSHostingView(rootView: PlaceholderPanelView())
+        panel.isReleasedWhenClosed = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.onCancel = { [weak self] in self?.hide() }
+        panel.onResignKey = { [weak self] in self?.hide() }
+
+        // contentViewController + NSHostingController makes the window size
+        // itself to the SwiftUI content's fitting size.
+        let root = RootView(onClose: { [weak self] in self?.hide() })
+        panel.contentViewController = NSHostingController(rootView: root)
         return panel
     }
-}
 
-private struct PlaceholderPanelView: View {
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "road.lanes")
-                .font(.system(size: 28))
-                .foregroundStyle(.tint)
-            Text("Lane")
-                .font(.headline)
-            Text("Press ⌥Space to toggle")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .frame(height: 120)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+    // MARK: - Placement
+
+    private func positionOnActiveScreen(_ panel: LanePanel) {
+        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
+            ?? NSScreen.main
+        guard let screen else { return }
+        let visible = screen.visibleFrame
+        let size = panel.frame.size
+        let x = visible.midX - size.width / 2
+        // Sit slightly above center, launcher-style.
+        let y = visible.midY - size.height / 2 + visible.height * 0.12
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
     }
 }

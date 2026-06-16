@@ -1,0 +1,28 @@
+//
+//  VisualEffectBackground.swift
+//  lane
+//
+//  SwiftUI bridge to NSVisualEffectView so the panel content can carry a
+//  native material behind it.
+//
+
+import SwiftUI
+import AppKit
+
+struct VisualEffectBackground: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .popover
+    var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = blendingMode
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
+        view.blendingMode = blendingMode
+    }
+}
