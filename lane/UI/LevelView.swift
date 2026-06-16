@@ -110,6 +110,9 @@ struct LevelView: View {
             return "No matches for “\(model.query)”."
         }
         if model.stack.isEmpty {
+            if model.library.root == nil {
+                return "Choose a root folder in Settings (⌘,) to get started."
+            }
             return "No tracks yet. Press ⌘N to create one."
         }
         return "Nothing here yet.\nLink a Jira ticket or drop a repo into this folder."
