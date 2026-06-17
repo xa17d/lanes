@@ -14,12 +14,12 @@ nonisolated struct FolderProvider: LaneProvider {
     func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
         let url = lane.url
         let laneID = lane.id
-        let apps = services.apps
         let iterm = services.iterm
 
+        // "Open in Finder" now ships as an example lane-level script-item
+        // (see examples/script-items); Open Terminal here keeps the built-in
+        // tagged iTerm session reuse.
         return [
-            BasicItem(id: "folder:finder", title: "Open in Finder", icon: .reveal,
-                      run: { apps.reveal(url); return .dismiss }),
             BasicItem(id: "folder:terminal", title: "Open Terminal here", icon: .terminal,
                       run: {
                           try iterm.openOrCreate(laneID: laneID, tag: "shell", cwd: url, command: nil)

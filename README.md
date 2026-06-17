@@ -18,16 +18,19 @@ item exposes actions that **focus an existing window or launch a new one**.
   as a lane's description on creation and on ⌘R.
 - **Inside a lane**, providers contribute actions:
   - **Jira** — focus an open ticket tab or open it in Chrome; link new tickets.
-  - **Repositories** — per repo: Open PR/CI (host-aware), Fork, Android Studio,
-    VS Code, Terminal here, Finder.
-  - **Folder** — Finder / Terminal at the lane root.
+  - **Repositories** — per repo: Open PR (host-aware) and Open Terminal here
+    (tagged iTerm session). The editor/Finder/CI launchers (Fork, Android
+    Studio, VS Code, Finder, GitHub Actions) ship as ready-to-use example
+    script-items in [`examples/`](examples/) rather than built-ins.
+  - **Folder** — Open Terminal here at the lane root (a Finder launcher is an
+    example script-item).
   - **Agents** — Claude / opencode in a tagged iTerm session at the lane root.
   - **Scripts** — drop an executable file in `<root>/.lanes/config/script-items/`
     to add a custom lane action (run with the lane dir as cwd); files under
     `script-items/repository/` become per-repo actions (run in the repo dir).
     Scripts run silently with `LANE_DIR`/`LANE_NAME`/`LANE_ID` (and
     `REPO_DIR`/`REPO_NAME`) in the environment; stderr from a failing script is
-    shown as a toast.
+    shown as a toast. See [`examples/`](examples/) for drop-in scripts.
 - **Search** is fuzzy and subtree-wide: typing filters the current level, and a
   non-empty query surfaces nested actions with their breadcrumb
   (`service-api › Open PR`).

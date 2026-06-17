@@ -17,7 +17,6 @@ nonisolated struct RepositoryProvider: LaneProvider {
         let git = services.git
         let hosts = services.hosts
         let chrome = services.chrome
-        let apps = services.apps
         let iterm = services.iterm
         let laneID = lane.id
 
@@ -42,7 +41,7 @@ nonisolated struct RepositoryProvider: LaneProvider {
                         childrenProvider: {
                             Self.actions(repoURL: repoURL, laneID: laneID,
                                          git: git, hosts: hosts, chrome: chrome,
-                                         apps: apps, iterm: iterm,
+                                         iterm: iterm,
                                          scripts: scripts, repoScripts: repoScripts, lane: lane)
                         }
                     )
@@ -58,15 +57,15 @@ nonisolated struct RepositoryProvider: LaneProvider {
     private static func actions(
         repoURL: URL, laneID: UUID,
         git: GitInspector, hosts: HostResolver, chrome: ChromeController,
-        apps: AppLauncher, iterm: ITermController,
+        iterm: ITermController,
         scripts: ScriptItems, repoScripts: [URL], lane: Lane
     ) -> [any Item] {
         let path = repoURL.path
         var actions: [any Item] = []
 
-        // Open PR only when the host is recognized. (Opening CI / GitHub
-        // Actions is no longer built in — it ships as an example script-item;
-        // see examples/script-items/repository.)
+        // Open PR only when the host is recognized. (Open PR keeps the built-in
+        // Chrome tab-focus behavior; Open CI and the editor/Finder launchers now
+        // ship as example script-items — see examples/script-items/repository.)
         if let remote = git.remote(of: repoURL), let adapter = hosts.adapter(for: remote) {
             let branch = git.branch(of: repoURL) ?? "HEAD"
             let prURL = adapter.prURL(remote, branch: branch)
@@ -75,21 +74,15 @@ nonisolated struct RepositoryProvider: LaneProvider {
                                      run: { try chrome.openInChrome(url: prURL); return .dismiss }))
         }
 
-        actions.append(BasicItem(id: "repo:\(path):fork", title: "Open in Fork", icon: .fork,
-                                 run: { try apps.open(app: "Fork", path: repoURL); return .dismiss }))
-        actions.append(BasicItem(id: "repo:\(path):as", title: "Open in Android Studio", icon: .editor,
-                                 run: { try apps.open(app: "Android Studio", path: repoURL); return .dismiss }))
-        actions.append(BasicItem(id: "repo:\(path):code", title: "Open in VS Code", icon: .code,
-                                 run: { try apps.open(app: "Visual Studio Code", path: repoURL); return .dismiss }))
+        // Open Terminal here keeps the built-in tagged iTerm session reuse.
         actions.append(BasicItem(id: "repo:\(path):term", title: "Open Terminal here", icon: .terminal,
                                  run: {
                                      try iterm.openOrCreate(laneID: laneID, tag: "repo:\(path)", cwd: repoURL, command: nil)
                                      return .dismiss
                                  }))
-        actions.append(BasicItem(id: "repo:\(path):finder", title: "Open in Finder", icon: .reveal,
-                                 run: { apps.reveal(repoURL); return .dismiss }))
 
-        // Custom per-repo scripts, run with this repo as cwd.
+        // Custom per-repo scripts (incl. the editor/Finder launcher examples),
+        // run with this repo as cwd.
         actions += scripts.repoItems(scripts: repoScripts, repoURL: repoURL, lane: lane)
         return actions
     }

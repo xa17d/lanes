@@ -57,17 +57,27 @@ struct RootView: View {
     }
 
     /// The active lane's one-line description, shown under the breadcrumb so
-    /// you can tell at a glance which lane you're in.
+    /// you can tell at a glance which lane you're in. A `{{color:text}}` status
+    /// marker is rendered as a colored badge rather than shown raw.
     @ViewBuilder private var laneSummary: some View {
-        if let summary = model.currentLane?.summary, !summary.isEmpty {
-            Text(summary)
-                .font(Tokens.Font.subtitle.italic())
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Tokens.Space.l)
-                .padding(.bottom, Tokens.Space.s)
+        let parsed = StatusBadge.parse(from: model.currentLane?.summary)
+        if parsed.badge != nil || !parsed.body.isEmpty {
+            HStack(spacing: Tokens.Space.s) {
+                if let badge = parsed.badge {
+                    StatusBadgeView(badge: badge)
+                }
+                if !parsed.body.isEmpty {
+                    Text(parsed.body)
+                        .font(Tokens.Font.subtitle.italic())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Tokens.Space.l)
+            .padding(.bottom, Tokens.Space.s)
         }
     }
 
