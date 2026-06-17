@@ -35,8 +35,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // First launch with no root → prompt for it before showing the list.
+        // Deferred so the SwiftUI Settings scene is fully wired before we ask
+        // it to open (otherwise the action is a no-op).
         if rootOverride == nil && core.library.root == nil {
-            AppDelegate.openSettings()
+            DispatchQueue.main.async { AppDelegate.openSettings() }
         }
 
         // Debug aid: LANE_AUTOSHOW=1 shows the panel on launch (used for

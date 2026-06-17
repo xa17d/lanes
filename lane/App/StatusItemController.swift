@@ -24,9 +24,12 @@ final class StatusItemController: NSObject {
         super.init()
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "road.lanes",
-                                   accessibilityDescription: "Lane")
-            button.image?.isTemplate = true
+            if let image = NSImage(systemSymbolName: "road.lanes", accessibilityDescription: "Lane") {
+                image.isTemplate = true
+                button.image = image
+            } else {
+                button.title = "Lane"   // fallback if the symbol is unavailable
+            }
         }
 
         let menu = NSMenu()
