@@ -16,16 +16,6 @@ final class PanelController {
     private var panel: LanePanel?
     private var keyMonitor: Any?
 
-    /// Where the user last dragged the panel, stored as the top-left anchor
-    /// (the panel grows downward, keeping its top fixed). In-memory for the
-    /// session, like the navigation state — a fresh launch re-centers. `nil`
-    /// until moved.
-    private var userTopLeft: NSPoint?
-    /// True while *we* are positioning the panel, so our own moves aren't
-    /// mistaken for a user drag.
-    private var repositioning = false
-    private var moveObserver: Any?
-
     init(model: LaneModel) {
         self.model = model
         model.onClose = { [weak self] in self?.hide() }
@@ -45,7 +35,10 @@ final class PanelController {
         model.reopen()
         model.panelAppeared = false
         installKeyMonitor()
-        restorePosition(panel)
+        // Always open centered on the screen under the mouse. The panel is
+        // draggable while visible, but each open re-centers on the active
+        // screen (the moved position is not remembered across opens).
+        positionOnActiveScreen(panel)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         // Drive the fade/scale-in (RootView animates on panelAppeared).
@@ -77,16 +70,6 @@ final class PanelController {
         panel.onCancel = { [weak self] in self?.model.escape() }
         panel.onResignKey = { [weak self] in self?.hide() }
         panel.contentViewController = NSHostingController(rootView: RootView(model: model))
-
-        // Remember a user drag so the panel reopens where they left it.
-        moveObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didMoveNotification, object: panel, queue: .main
-        ) { [weak self, weak panel] _ in
-            MainActor.assumeIsolated {
-                guard let self, let panel, !self.repositioning else { return }
-                self.userTopLeft = NSPoint(x: panel.frame.minX, y: panel.frame.maxY)
-            }
-        }
         return panel
     }
 
@@ -141,22 +124,6 @@ final class PanelController {
     }
 
     // MARK: - Placement
-
-    /// Reuse the user's dragged position if it's still on a visible screen;
-    /// otherwise center on the screen under the mouse.
-    private func restorePosition(_ panel: LanePanel) {
-        repositioning = true
-        defer { repositioning = false }
-        if let topLeft = userTopLeft {
-            let origin = NSPoint(x: topLeft.x, y: topLeft.y - panel.frame.height)
-            let frame = NSRect(origin: origin, size: panel.frame.size)
-            if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(frame) }) {
-                panel.setFrameOrigin(origin)
-                return
-            }
-        }
-        positionOnActiveScreen(panel)
-    }
 
     private func positionOnActiveScreen(_ panel: LanePanel) {
         let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
