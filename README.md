@@ -8,9 +8,14 @@ item exposes actions that **focus an existing window or launch a new one**.
 
 - **⌥Space** toggles a floating launcher panel (menu-bar accessory app, no Dock
   icon).
-- **Level 0** lists your lanes (every visible folder under the configured root).
-  `↵` opens a lane, `→` reveals its management menu (Rename / Archive / Delete…),
-  `⌘N` creates one, `⌘⇧A` toggles archived lanes.
+- **Level 0** lists your lanes (every visible folder under the configured root),
+  each showing its description large with the folder name beneath. `↵` opens a
+  lane, `→` reveals its management menu (Rename / Archive / Delete…), `⌘N`
+  creates one, `⌘⇧A` toggles archived lanes, `⌘R` refreshes descriptions. Search
+  matches both the name and the description. A description can embed a status
+  badge with `{{color:text}}` (e.g. `{{green:Ready to ship}}`). If
+  `<root>/.lanes/config/hooks/update-lane-description` exists, its output is used
+  as a lane's description on creation and on ⌘R.
 - **Inside a lane**, providers contribute actions:
   - **Jira** — focus an open ticket tab or open it in Chrome; link new tickets.
   - **Repositories** — per repo: Open PR/CI (host-aware), Fork, Android Studio,

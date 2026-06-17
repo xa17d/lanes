@@ -61,6 +61,12 @@ nonisolated enum LaneFS {
         scriptItemsDir(in: root).appendingPathComponent("repository", isDirectory: true)
     }
 
+    /// `<root>/.lanes/config/hooks` — lifecycle hook scripts (e.g.
+    /// `update-lane-description`).
+    static func hooksDir(in root: URL) -> URL {
+        configDir(in: root).appendingPathComponent("hooks", isDirectory: true)
+    }
+
     // MARK: - Meta
 
     private static func metaURL(for laneURL: URL) -> URL {

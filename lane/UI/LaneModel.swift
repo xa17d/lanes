@@ -134,7 +134,8 @@ final class LaneModel: ObservableObject {
         }
         // "New lane…" is always last.
         if let root = library.root {
-            rows.append(DisplayRow(item: LaneActions.newLaneItem(root: root), pathLabels: []))
+            let item = LaneActions.newLaneItem(root: root, hooks: LaneHooks(shell: services.shell))
+            rows.append(DisplayRow(item: item, pathLabels: []))
         }
         return rows
     }
@@ -205,7 +206,7 @@ final class LaneModel: ObservableObject {
         }
         // Carry whatever was typed in the search field into the name field as
         // a starting suggestion.
-        pushInput(LaneActions.newLaneRequest(root: root), seed: query)
+        pushInput(LaneActions.newLaneRequest(root: root, hooks: LaneHooks(shell: services.shell)), seed: query)
     }
 
     func pop() {
@@ -226,6 +227,45 @@ final class LaneModel: ObservableObject {
                 loadLaneLevel(levelID: level.id)
             }
         }
+    }
+
+    /// ⌘R: reload the current level *and* re-run the update-lane-description
+    /// hook so descriptions reflect their latest state.
+    func refresh() {
+        reloadCurrent()
+        refreshDescriptions()
+    }
+
+    /// Re-run `update-lane-description` off the main thread, then fold the new
+    /// descriptions back in. In the lane list this refreshes every listed lane;
+    /// inside a lane it refreshes just that lane (updating the header).
+    private func refreshDescriptions() {
+        guard let root = library.root else { return }
+        let hooks = LaneHooks(shell: services.shell)
+        if stack.isEmpty {
+            let targets = lanes
+            Task.detached {
+                for lane in targets {
+                    if let desc = hooks.description(for: lane, root: root) {
+                        _ = try? LaneFS.setSummary(lane, to: desc)
+                    }
+                }
+                await self.reloadLanes()
+            }
+        } else if let lane = currentLane {
+            Task.detached {
+                guard let desc = hooks.description(for: lane, root: root),
+                      let updated = try? LaneFS.setSummary(lane, to: desc) else { return }
+                await self.applyLaneUpdate(updated)
+            }
+        }
+    }
+
+    /// Reflect a refreshed lane's metadata in the in-memory caches (the list
+    /// row and, if it's the open lane, the header).
+    private func applyLaneUpdate(_ lane: Lane) {
+        if let i = lanes.firstIndex(where: { $0.id == lane.id }) { lanes[i] = lane }
+        if !stack.isEmpty, stack[0].lane?.id == lane.id { stack[0].lane = lane }
     }
 
     private func activate(item: any Item) {

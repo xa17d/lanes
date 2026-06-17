@@ -10,19 +10,23 @@
 import Foundation
 
 nonisolated enum LaneActions {
-    static func newLaneRequest(root: URL) -> InputRequest {
+    static func newLaneRequest(root: URL, hooks: LaneHooks) -> InputRequest {
         InputRequest(title: "New lane", placeholder: "Lane name") { name in
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { throw InputError(message: "Enter a lane name.") }
-            let lane = try LaneFS.create(name: trimmed, in: root)
+            var lane = try LaneFS.create(name: trimmed, in: root)
+            // Seed the description from the update-lane-description hook, if any.
+            if let desc = hooks.description(for: lane, root: root) {
+                lane = (try? LaneFS.setSummary(lane, to: desc)) ?? lane
+            }
             return .enter(lane)
         }
     }
 
-    static func newLaneItem(root: URL) -> any Item {
+    static func newLaneItem(root: URL, hooks: LaneHooks) -> any Item {
         BasicItem(id: "lane:new", title: "New lane…", icon: .add,
                   keywords: ["new", "create", "lane"],
-                  run: { .pushInput(newLaneRequest(root: root)) })
+                  run: { .pushInput(newLaneRequest(root: root, hooks: hooks)) })
     }
 
     /// The library root that owns `lane`, derived from its location: the parent
