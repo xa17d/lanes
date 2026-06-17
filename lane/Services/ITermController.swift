@@ -2,8 +2,15 @@
 //  ITermController.swift
 //  lane
 //
-//  Find-or-create a tagged iTerm2 session. Sessions are tagged by name with a
-//  stable sentinel «lane:<laneID>:<tag>» so they can be re-focused later.
+//  Find-or-create a tagged iTerm2 session. Sessions are tagged with a stable
+//  sentinel «lane:<laneID>:<tag>» stored in an iTerm2 user-defined variable
+//  (`user.lane`) so they can be re-focused later.
+//
+//  NB: the tag is deliberately NOT stored in the session `name`. iTerm2 lets
+//  the running shell/program rewrite the session name (via the prompt or OSC
+//  title escapes) within moments of launch, which wiped out a name-based
+//  sentinel and made every reopen spawn a new window. User-defined variables
+//  are not touched by title updates, so they survive for the session's life.
 //
 
 import Foundation
@@ -32,13 +39,18 @@ nonisolated struct ITermController: Sendable {
         }
     }
 
-    // Verbatim from the spec (§7), with named placeholders.
+    // Tag/lookup uses the `user.lane` session variable (not the volatile
+    // session name). Reading an unset variable can error, so guard it.
     private static let script = """
     tell application "iTerm2"
         repeat with w in windows
             repeat with t in tabs of w
                 repeat with s in sessions of t
-                    if name of s contains "%SENTINEL%" then
+                    set theTag to ""
+                    try
+                        tell s to set theTag to (variable named "user.lane")
+                    end try
+                    if theTag is "%SENTINEL%" then
                         select w
                         tell t to select
                         tell s to select
@@ -50,7 +62,7 @@ nonisolated struct ITermController: Sendable {
         end repeat
         set newWindow to (create window with default profile)
         tell current session of newWindow
-            set name to "%SENTINEL%"
+            set variable named "user.lane" to "%SENTINEL%"
             write text "cd " & quoted form of "%CWD%"
             if "%COMMAND%" is not "" then write text "%COMMAND%"
         end tell
