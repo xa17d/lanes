@@ -23,9 +23,9 @@ item exposes actions that **focus an existing window or launch a new one**.
 
 ## Architecture
 
-Four layers (`Lane` → `Item` → `LaneProvider` → `Services`); see `PLAN.md` for
-the full design. Persistence is folder-based: a lane is a directory, its
-metadata lives in `.lane/`, archived lanes move under `.archive/`.
+Four layers (`Lane` → `Item` → `LaneProvider` → `Services`). Persistence is
+folder-based: a lane is a directory, its metadata lives in `.lane/`, archived
+lanes move under `.archive/`.
 
 ## Build & run
 
