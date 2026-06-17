@@ -24,6 +24,10 @@ protocol Item: Identifiable, Sendable {
     nonisolated var subtitle: String? { get }
     nonisolated var icon: IconToken { get }
     nonisolated var keywords: [String] { get }
+    /// "Meta" actions (e.g. "Link Jira ticket…", "Manage lane…") that should
+    /// rank *below* genuine content matches when searching, even if their
+    /// title scores higher for the query.
+    nonisolated var isSecondary: Bool { get }
     nonisolated var run: (@Sendable () async throws -> RunOutcome)? { get }
     nonisolated func children() async -> [any Item]
 }
@@ -32,6 +36,7 @@ extension Item {
     var subtitle: String? { nil }
     var icon: IconToken { .generic }
     var keywords: [String] { [] }
+    var isSecondary: Bool { false }
     var run: (@Sendable () async throws -> RunOutcome)? { nil }
     func children() async -> [any Item] { [] }
 }
@@ -43,6 +48,7 @@ nonisolated struct BasicItem: Item {
     var subtitle: String? = nil
     var icon: IconToken = .generic
     var keywords: [String] = []
+    var isSecondary: Bool = false
     var run: (@Sendable () async throws -> RunOutcome)? = nil
     var childrenProvider: @Sendable () async -> [any Item] = { [] }
 

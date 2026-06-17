@@ -38,6 +38,7 @@ nonisolated enum TrackActions {
         let root = root(of: track)
         return BasicItem(id: "track:manage", title: "Manage track…", icon: .manage,
                          keywords: ["manage", "rename", "archive", "delete", "settings"],
+                         isSecondary: true,
                          childrenProvider: {
                              managementItems(for: track, root: root, apps: apps)
                          })

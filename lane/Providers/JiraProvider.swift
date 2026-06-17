@@ -47,6 +47,7 @@ nonisolated struct JiraProvider: TrackProvider {
             title: "Link Jira ticket…",
             icon: .add,
             keywords: ["new", "link", "jira"],
+            isSecondary: true,   // rank below the actual linked tickets
             run: { .pushInput(Self.linkRequest(store: store)) }
         ))
         return items

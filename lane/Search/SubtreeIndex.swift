@@ -47,6 +47,11 @@ nonisolated enum SubtreeIndex {
                                              keywords: entry.item.keywords) else { return nil }
             return (entry, s)
         }
-        return scored.sorted { $0.1 > $1.1 }.map(\.0)
+        // Primary (content) matches first, then secondary "meta" actions like
+        // "Link Jira ticket…"; within each group, best score first.
+        return scored.sorted { a, b in
+            if a.0.item.isSecondary != b.0.item.isSecondary { return !a.0.item.isSecondary }
+            return a.1 > b.1
+        }.map(\.0)
     }
 }
