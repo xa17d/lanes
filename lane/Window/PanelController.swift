@@ -32,7 +32,7 @@ final class PanelController {
     func show() {
         let panel = self.panel ?? makePanel()
         self.panel = panel
-        model.reset()
+        model.reopen()
         model.panelAppeared = false
         installKeyMonitor()
         positionOnActiveScreen(panel)

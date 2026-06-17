@@ -35,12 +35,30 @@ final class LaneModel: ObservableObject {
 
     // MARK: - Lifecycle
 
-    /// Called every time the panel opens: re-scan from disk and reset to level 0.
+    /// Hard reset to the root track list. Used on first launch and as the
+    /// fallback when the level we were on is no longer valid.
     func reset() {
         stack = []
         query = ""
         selection = 0
         reloadTracks()
+    }
+
+    /// Called when the panel is re-shown via the hotkey. Returns you to where
+    /// you left off (the navigation stack is kept in memory, so this only holds
+    /// within a single process — a restart starts with an empty stack = root).
+    /// Refreshes the root list for external changes, and falls back to the root
+    /// if the track we were inside has since vanished on disk.
+    func reopen() {
+        if let track = currentTrack,
+           !FileManager.default.fileExists(atPath: track.url.path) {
+            reset()
+            return
+        }
+        if stack.isEmpty {
+            reloadTracks()      // pick up external add / rename / delete
+        }
+        if !rows.indices.contains(selection) { selection = 0 }
     }
 
     func reloadTracks() {
