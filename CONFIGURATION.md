@@ -67,9 +67,16 @@ the launcher.
   (`chmod +x script-items/deploy.sh`). The file is executed directly, so its
   **shebang** chooses the interpreter — bash, zsh, Python, Node, anything.
 - Dotfiles and `README*` are ignored.
-- The action's **title** is the prettified filename: the extension is dropped, a
-  leading ordering prefix is stripped, and `-`/`_` become spaces. So
-  `10-deploy-prod.sh` shows as **deploy prod** (and the `10-` keeps it ordered).
+- The action's **title** is the prettified filename: the `[icon]` token (see
+  below) and extension are dropped, a leading ordering prefix is stripped, and
+  `-`/`_` become spaces. So `10-deploy-prod.sh` shows as **deploy prod** (and the
+  `10-` keeps it ordered).
+- The action's **icon** defaults to a scroll. To choose your own, put an
+  [SF Symbol](https://developer.apple.com/sf-symbols/) name in square brackets
+  anywhere in the filename: `deploy[bolt.fill].sh` shows as **deploy** with the
+  `bolt.fill` icon. The brackets delimit the symbol unambiguously (SF Symbol
+  names contain dots), so it works with or without a file extension. An invalid
+  symbol name falls back to the scroll.
 - Scripts run **silently**. On success the panel just closes; on a **non-zero
   exit** the script's stderr is shown as an error toast. (Use a script that
   opens a terminal/app itself if you want to watch long-running output.)
@@ -88,7 +95,8 @@ Scripts inherit your environment (so `PATH` etc. are intact) plus:
 
 ### Example
 
-`.lanes/config/script-items/open-jira.sh`:
+`.lanes/config/script-items/open-jira[link].sh` (shows as **open jira** with the
+`link` icon):
 
 ```sh
 #!/usr/bin/env bash
@@ -96,7 +104,8 @@ set -euo pipefail
 open "https://jira.example.com/browse/$(basename "$LANE_DIR")"
 ```
 
-`.lanes/config/script-items/repository/fetch.sh`:
+`.lanes/config/script-items/repository/fetch[arrow.triangle.2.circlepath].sh`
+(shows as **fetch** inside each repo):
 
 ```sh
 #!/usr/bin/env bash
@@ -105,8 +114,8 @@ git -C "$REPO_DIR" fetch --all --prune
 ```
 
 ```sh
-chmod +x .lanes/config/script-items/open-jira.sh
-chmod +x .lanes/config/script-items/repository/fetch.sh
+chmod +x ".lanes/config/script-items/open-jira[link].sh"
+chmod +x ".lanes/config/script-items/repository/fetch[arrow.triangle.2.circlepath].sh"
 ```
 
 ---

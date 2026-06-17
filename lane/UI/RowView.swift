@@ -7,14 +7,23 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct RowView: View {
     let row: DisplayRow
     let isSelected: Bool
 
+    /// Custom (script-supplied) SF Symbol names may be invalid; fall back to the
+    /// script glyph rather than rendering blank. Built-in tokens always resolve.
+    private var symbolName: String {
+        let name = row.icon.symbol
+        return NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
+            ? name : IconToken.script.symbol
+    }
+
     var body: some View {
         HStack(spacing: Tokens.Space.m) {
-            Image(systemName: row.icon.symbol)
+            Image(systemName: symbolName)
                 .font(.system(size: 15))
                 .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 .frame(width: 22, alignment: .center)

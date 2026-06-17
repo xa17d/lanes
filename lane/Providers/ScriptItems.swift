@@ -35,14 +35,34 @@ nonisolated struct ScriptItems: Sendable {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 
-    /// Filename → display title: drop the extension, strip a leading ordering
-    /// prefix ("10-deploy.sh" → "deploy"), and turn -/_ into spaces.
+    /// Filename → display title: strip a `[sf.symbol]` icon token, drop the
+    /// extension, strip a leading ordering prefix ("10-deploy.sh" → "deploy"),
+    /// and turn -/_ into spaces.
     static func title(for url: URL) -> String {
-        var name = url.deletingPathExtension().lastPathComponent
+        // Remove the icon token first — it can contain dots, so it must go
+        // before deletingPathExtension (which would otherwise mangle it).
+        var name = url.lastPathComponent
+            .replacingOccurrences(of: "\\[[^\\]]*\\]", with: "", options: .regularExpression)
+        name = (name as NSString).deletingPathExtension
         name = name.replacingOccurrences(of: "^[0-9]+[-_ ]+", with: "", options: .regularExpression)
         name = name.replacingOccurrences(of: "[-_]+", with: " ", options: .regularExpression)
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         return trimmed.isEmpty ? url.lastPathComponent : trimmed
+    }
+
+    /// The SF Symbol name from a `[symbol]` token in the filename, e.g.
+    /// `deploy[bolt.fill].sh` → "bolt.fill". Nil when there's no token.
+    static func iconSymbol(for url: URL) -> String? {
+        let name = url.lastPathComponent
+        guard let r = name.range(of: "\\[[^\\]]+\\]", options: .regularExpression) else { return nil }
+        let trimmed = name[r].dropFirst().dropLast().trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// The icon for a script: its `[symbol]` token if present, else the default
+    /// scroll glyph. (Validity of a custom symbol is checked at render time.)
+    static func icon(for url: URL) -> IconToken {
+        iconSymbol(for: url).map(IconToken.custom) ?? .script
     }
 
     // MARK: - Items
@@ -79,7 +99,7 @@ nonisolated struct ScriptItems: Sendable {
         return BasicItem(
             id: id,
             title: Self.title(for: scriptURL),
-            icon: .script,
+            icon: Self.icon(for: scriptURL),
             keywords: ["script", "run", scriptURL.lastPathComponent],
             run: {
                 // Silent: exec the file directly so its shebang chooses the

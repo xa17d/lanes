@@ -30,6 +30,9 @@ nonisolated enum IconToken: Sendable, Hashable {
     case note
     case script
     case generic
+    /// A raw SF Symbol name (used by script-items via the `[symbol]` filename
+    /// convention). Rendering validates it and falls back if it doesn't exist.
+    case custom(String)
 
     var symbol: String {
         switch self {
@@ -54,6 +57,7 @@ nonisolated enum IconToken: Sendable, Hashable {
         case .note:         return "text.alignleft"
         case .script:       return "scroll"
         case .generic:      return "circle"
+        case .custom(let name): return name
         }
     }
 }
