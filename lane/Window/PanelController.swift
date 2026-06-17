@@ -112,15 +112,33 @@ final class PanelController {
         case 126: model.moveSelection(-1); return true   // ↑
         case 36, 76: model.confirm(); return true        // return / enter
         case 53: model.escape(); return true             // esc
-        case 124:                                        // → drill in (when not editing text)
-            if model.query.isEmpty { model.drillRight(); return true }
+        case 124:                                        // → drill in
+            // Drill when there's no text to move through, or when the caret is
+            // already at the end of the query (nothing more to the right).
+            if model.query.isEmpty || queryCaretAtEnd { model.drillRight(); return true }
             return false
         case 123:                                        // ← pop (when not editing text)
+            if model.query.isEmpty { model.pop(); return true }
+            return false
+        case 51:                                         // ⌫ backspace
+            // With an empty query, backspace steps back instead of doing
+            // nothing; with text, it falls through to delete a character.
             if model.query.isEmpty { model.pop(); return true }
             return false
         default:
             return false
         }
+    }
+
+    /// Whether the search field's caret sits at (or past) the end of the text,
+    /// so a → keypress should drill in rather than move the cursor. Returns
+    /// true when no field editor is active (treat as "nothing to the right").
+    private var queryCaretAtEnd: Bool {
+        guard let editor = (panel?.firstResponder as? NSTextView)
+                ?? (panel?.fieldEditor(false, for: nil) as? NSTextView)
+        else { return true }
+        let selection = editor.selectedRange()
+        return selection.location + selection.length >= (editor.string as NSString).length
     }
 
     // MARK: - Placement
