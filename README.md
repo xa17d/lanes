@@ -24,8 +24,10 @@ item exposes actions that **focus an existing window or launch a new one**.
 ## Architecture
 
 Four layers (`Lane` → `Item` → `LaneProvider` → `Services`). Persistence is
-folder-based: a lane is a directory, its metadata lives in `.lane/`, archived
-lanes move under `.archive/`.
+folder-based: a lane is a directory and its metadata lives in `.lane/`. All
+app-managed state for a root sits under `<root>/.lanes/`: archived lanes move to
+`.lanes/archive/`, and an optional `.lanes/config/template/` folder seeds the
+contents of every newly created (or externally adopted) lane.
 
 ## Build & run
 

@@ -17,7 +17,10 @@ nonisolated struct Lane: Identifiable, Hashable, Sendable {
 
     var name: String { url.lastPathComponent }                  // = folder name
     var isArchived: Bool {
-        url.deletingLastPathComponent().lastPathComponent == ".archive"
+        // Archived lanes live at <root>/.lanes/archive/<lane>.
+        let parent = url.deletingLastPathComponent()
+        return parent.lastPathComponent == LaneFS.archiveDirName
+            && parent.deletingLastPathComponent().lastPathComponent == LaneFS.lanesDirName
     }
     var dotLane: URL { url.appendingPathComponent(".lane", isDirectory: true) }
 }

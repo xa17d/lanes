@@ -20,10 +20,32 @@ nonisolated enum LaneFSError: LocalizedError {
 }
 
 nonisolated enum LaneFS {
-    static let archiveDirName = ".archive"
+    /// The single dotfolder under the root that holds all of Lanes' own state:
+    /// `archive/` (archived lanes) and `config/template/` (new-lane template).
+    static let lanesDirName = ".lanes"
+    /// Archived lanes live under `<root>/.lanes/archive/` (no leading dot — the
+    /// `.lanes` parent already hides the whole tree).
+    static let archiveDirName = "archive"
     static let metaKey = "lane"
 
     private static var fm: FileManager { .default }
+
+    // MARK: - Well-known locations
+
+    static func lanesDir(in root: URL) -> URL {
+        root.appendingPathComponent(lanesDirName, isDirectory: true)
+    }
+
+    static func archiveDir(in root: URL) -> URL {
+        lanesDir(in: root).appendingPathComponent(archiveDirName, isDirectory: true)
+    }
+
+    /// `<root>/.lanes/config/template` — its contents seed every new lane.
+    static func templateDir(in root: URL) -> URL {
+        lanesDir(in: root)
+            .appendingPathComponent("config", isDirectory: true)
+            .appendingPathComponent("template", isDirectory: true)
+    }
 
     // MARK: - Meta
 
@@ -42,6 +64,11 @@ nonisolated enum LaneFS {
         }
         let meta = LaneMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil, summary: nil)
         try JSONFile.writeAtomic(meta, to: url)
+        // The folder becomes a lane the moment its meta is first written —
+        // whether we just created it or adopted an externally-made folder on
+        // scan. Either way, seed it from the template here so both paths share
+        // exactly one code path.
+        applyTemplateIfPresent(to: laneURL)
         return meta
     }
 
@@ -71,8 +98,7 @@ nonisolated enum LaneFS {
     static func lanes(in root: URL, includeArchived: Bool = false) -> [Lane] {
         var urls = childDirectories(of: root)
         if includeArchived {
-            let archive = root.appendingPathComponent(archiveDirName, isDirectory: true)
-            urls += childDirectories(of: archive)
+            urls += childDirectories(of: archiveDir(in: root))
         }
         let loaded = urls.compactMap { try? lane(at: $0) }
         return loaded.sorted { a, b in
@@ -92,9 +118,9 @@ nonisolated enum LaneFS {
         let dest = root.appendingPathComponent(name, isDirectory: true)
         guard !fm.fileExists(atPath: dest.path) else { throw LaneFSError.alreadyExists(name) }
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        let meta = LaneMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil, summary: nil)
-        try JSONFile.writeAtomic(meta, to: metaURL(for: dest))
-        return Lane(url: dest, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: nil, summary: nil)
+        // Go through loadOrCreateMeta (via lane(at:)) so creation and external
+        // adoption share the same meta-write + template-seeding logic.
+        return try lane(at: dest)
     }
 
     @discardableResult
@@ -117,9 +143,9 @@ nonisolated enum LaneFS {
     }
 
     static func archive(_ lane: Lane, in root: URL) throws -> Lane {
-        let archiveDir = root.appendingPathComponent(archiveDirName, isDirectory: true)
-        try fm.createDirectory(at: archiveDir, withIntermediateDirectories: true)
-        let dest = uniqueDestination(in: archiveDir, base: lane.name)
+        let dir = archiveDir(in: root)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dest = uniqueDestination(in: dir, base: lane.name)
         try fm.moveItem(at: lane.url, to: dest)
         return try self.lane(at: dest)
     }
@@ -144,6 +170,22 @@ nonisolated enum LaneFS {
     }
 
     // MARK: - Helpers
+
+    /// Copy the contents of `<root>/.lanes/config/template` into a freshly
+    /// minted lane. The root is the lane's parent (active lanes sit directly
+    /// under the root). No-op when there is no template. Existing entries in the
+    /// lane (e.g. the `.lane` meta we just wrote) are never clobbered.
+    private static func applyTemplateIfPresent(to laneURL: URL) {
+        let template = templateDir(in: laneURL.deletingLastPathComponent())
+        guard let entries = try? fm.contentsOfDirectory(
+            at: template, includingPropertiesForKeys: nil, options: []
+        ) else { return }
+        for entry in entries {
+            let dest = laneURL.appendingPathComponent(entry.lastPathComponent)
+            guard !fm.fileExists(atPath: dest.path) else { continue }
+            try? fm.copyItem(at: entry, to: dest)
+        }
+    }
 
     /// First of `base`, `base-2`, `base-3`, … that does not exist in `dir`.
     private static func uniqueDestination(in dir: URL, base: String) -> URL {

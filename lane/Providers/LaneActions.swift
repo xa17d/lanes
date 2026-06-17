@@ -25,11 +25,14 @@ nonisolated enum LaneActions {
                   run: { .pushInput(newLaneRequest(root: root)) })
     }
 
-    /// The library root that owns `lane`, derived from its location: the
-    /// parent folder, or the grandparent when the lane lives under `.archive/`.
+    /// The library root that owns `lane`, derived from its location: the parent
+    /// folder for an active lane, or three levels up for an archived lane (which
+    /// lives at `<root>/.lanes/archive/<lane>`).
     static func root(of lane: Lane) -> URL {
         let parent = lane.url.deletingLastPathComponent()
-        return lane.isArchived ? parent.deletingLastPathComponent() : parent
+        return lane.isArchived
+            ? parent.deletingLastPathComponent().deletingLastPathComponent()
+            : parent
     }
 
     /// A single "Manage lane…" container drilling into the management actions,
