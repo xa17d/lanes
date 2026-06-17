@@ -1,4 +1,4 @@
-# Lane
+# Lanes
 
 A keyboard-first macOS launcher for switching between parallel work **lanes**.
 Each lane is a folder; inside it live repos and linked Jira tickets, and every

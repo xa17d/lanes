@@ -40,14 +40,14 @@ struct SettingsView: View {
             }
 
             Section("Hotkey") {
-                KeyboardShortcuts.Recorder("Toggle Lane", name: .toggleLane)
+                KeyboardShortcuts.Recorder("Toggle Lanes", name: .toggleLane)
             }
 
             Section("Permissions") {
                 Button("Open Automation settings…") {
                     Permissions.openAutomationSettings()
                 }
-                Text("Lane controls Chrome and iTerm via Apple Events.")
+                Text("Lanes controls Chrome and iTerm via Apple Events.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

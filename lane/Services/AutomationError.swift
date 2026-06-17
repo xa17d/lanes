@@ -16,7 +16,7 @@ nonisolated enum AutomationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notAuthorized(let app):
-            return "Lane needs permission to control \(app). Grant it in System Settings → Privacy & Security → Automation."
+            return "Lanes needs permission to control \(app). Grant it in System Settings → Privacy & Security → Automation."
         case .notInstalled(let app):
             return "\(app) isn’t installed."
         case .failed(_, let message):

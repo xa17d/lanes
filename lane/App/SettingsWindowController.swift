@@ -23,7 +23,7 @@ final class SettingsWindowController {
         if window == nil {
             let hosting = NSHostingController(rootView: SettingsView(library: library))
             let window = NSWindow(contentViewController: hosting)
-            window.title = "Lane Settings"
+            window.title = "Lanes Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.center()

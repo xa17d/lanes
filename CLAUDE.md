@@ -2,7 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Lane is a keyboard-first macOS launcher for switching between parallel work "lanes". See `README.md` for the user-facing feature set.
+Lanes is a keyboard-first macOS launcher for switching between parallel work "lanes". See `README.md` for the user-facing feature set.
+
+Note: the app/product is named **Lanes** (`PRODUCT_NAME = Lanes`), so the built bundle is `Lanes.app` and the binary is `Lanes`. The Xcode target, scheme, project file (`lane.xcodeproj`) and source folder (`lane/`) keep the internal name `lane`, and the bundle id stays `at.xa1.lane`.
 
 ## Build & run
 
@@ -18,7 +20,7 @@ xcodebuild -project lane.xcodeproj -scheme lane -configuration Debug \
 # launch — it adds a menu-bar item + the ⌥Space hotkey). Useful env overrides:
 #   LANE_ROOT=/path/to/lanes   skip the Settings root picker
 #   LANE_AUTOSHOW=1             show the panel immediately (headless smoke test)
-LANE_ROOT=/tmp/lanes LANE_AUTOSHOW=1 ./.build/Build/Products/Debug/lane.app/Contents/MacOS/lane
+LANE_ROOT=/tmp/lanes LANE_AUTOSHOW=1 ./.build/Build/Products/Debug/Lanes.app/Contents/MacOS/Lanes
 ```
 
 `xcodebuild` needs the sandbox disabled (its daemon writes outside any allowed path). `.build/` is gitignored. The one SPM dependency (KeyboardShortcuts) resolves on first build.
