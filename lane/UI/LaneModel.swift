@@ -167,7 +167,9 @@ final class LaneModel: ObservableObject {
             showToast("Set a root folder in Settings (⌘,) first.", kind: .error)
             return
         }
-        pushInput(TrackActions.newTrackRequest(root: root))
+        // Carry whatever was typed in the search field into the name field as
+        // a starting suggestion.
+        pushInput(TrackActions.newTrackRequest(root: root), seed: query)
     }
 
     private func showManagement(for track: Track) {
@@ -198,8 +200,11 @@ final class LaneModel: ObservableObject {
 
     private func activate(item: any Item) {
         if let run = item.run {
+            // For "New track…", seed the name field with the current query so
+            // a search that found nothing becomes the new track's name.
+            let seed = item.id == "track:new" ? query : nil
             Task {
-                do { honor(try await run()) }
+                do { honor(try await run(), seed: seed) }
                 catch { showToast(error.localizedDescription, kind: .error) }
             }
         } else {
@@ -216,7 +221,7 @@ final class LaneModel: ObservableObject {
         }
     }
 
-    private func honor(_ outcome: RunOutcome) {
+    private func honor(_ outcome: RunOutcome, seed: String? = nil) {
         switch outcome {
         case .dismiss:
             onClose()
@@ -233,17 +238,23 @@ final class LaneModel: ObservableObject {
         case .enter(let track):
             enter(track: track)
         case .pushInput(let request):
-            pushInput(request)
+            pushInput(request, seed: seed)
         case .pushItems(let title, let items):
             pushItems(title: title, items: items)
         }
     }
 
-    private func pushInput(_ request: InputRequest) {
+    private func pushInput(_ request: InputRequest, seed: String? = nil) {
         var level = LevelState(kind: .input(request), titleSegment: request.title)
         level.track = currentTrack
         stack.append(level)
-        inputText = request.initialText
+        // A request with prefilled text (e.g. Rename) wins; otherwise fall back
+        // to the seed (the carried-over search query) if there is one.
+        if request.initialText.isEmpty, let seed, !seed.isEmpty {
+            inputText = seed
+        } else {
+            inputText = request.initialText
+        }
         query = ""
         selection = 0
     }
