@@ -17,6 +17,12 @@ item exposes actions that **focus an existing window or launch a new one**.
     VS Code, Terminal here, Finder.
   - **Folder** — Finder / Terminal at the lane root.
   - **Agents** — Claude / opencode in a tagged iTerm session at the lane root.
+  - **Scripts** — drop an executable file in `<root>/.lanes/config/script-items/`
+    to add a custom lane action (run with the lane dir as cwd); files under
+    `script-items/repository/` become per-repo actions (run in the repo dir).
+    Scripts run silently with `LANE_DIR`/`LANE_NAME`/`LANE_ID` (and
+    `REPO_DIR`/`REPO_NAME`) in the environment; stderr from a failing script is
+    shown as a toast.
 - **Search** is fuzzy and subtree-wide: typing filters the current level, and a
   non-empty query surfaces nested actions with their breadcrumb
   (`service-api › Open PR`).

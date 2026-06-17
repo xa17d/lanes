@@ -10,11 +10,18 @@ import Foundation
 
 nonisolated struct Shell: Sendable {
     @discardableResult
-    func run(_ launchPath: String, _ args: [String], cwd: URL? = nil) throws -> String {
+    func run(_ launchPath: String, _ args: [String], cwd: URL? = nil,
+             env: [String: String]? = nil) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: launchPath)
         process.arguments = args
         if let cwd { process.currentDirectoryURL = cwd }
+        if let env {
+            // Layer the extra vars on top of the inherited environment so the
+            // child keeps PATH etc.
+            process.environment = ProcessInfo.processInfo.environment
+                .merging(env) { _, new in new }
+        }
 
         let outPipe = Pipe()
         let errPipe = Pipe()

@@ -21,6 +21,7 @@ nonisolated struct ProviderRegistry: Sendable {
         RepositoryProvider(),
         FolderProvider(),
         AgentsProvider(),
+        ScriptItemsProvider(),
         LaneManagementProvider(),
     ])
 }

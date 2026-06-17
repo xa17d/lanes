@@ -40,11 +40,25 @@ nonisolated enum LaneFS {
         lanesDir(in: root).appendingPathComponent(archiveDirName, isDirectory: true)
     }
 
+    private static func configDir(in root: URL) -> URL {
+        lanesDir(in: root).appendingPathComponent("config", isDirectory: true)
+    }
+
     /// `<root>/.lanes/config/template` — its contents seed every new lane.
     static func templateDir(in root: URL) -> URL {
-        lanesDir(in: root)
-            .appendingPathComponent("config", isDirectory: true)
-            .appendingPathComponent("template", isDirectory: true)
+        configDir(in: root).appendingPathComponent("template", isDirectory: true)
+    }
+
+    /// `<root>/.lanes/config/script-items` — each executable file is a custom
+    /// lane-level action (run with the lane dir as cwd).
+    static func scriptItemsDir(in root: URL) -> URL {
+        configDir(in: root).appendingPathComponent("script-items", isDirectory: true)
+    }
+
+    /// `<root>/.lanes/config/script-items/repository` — each executable file is
+    /// a custom per-repository action (run with the repo dir as cwd).
+    static func repoScriptItemsDir(in root: URL) -> URL {
+        scriptItemsDir(in: root).appendingPathComponent("repository", isDirectory: true)
     }
 
     // MARK: - Meta

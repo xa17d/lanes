@@ -21,6 +21,13 @@ nonisolated struct RepositoryProvider: LaneProvider {
         let iterm = services.iterm
         let laneID = lane.id
 
+        // Custom per-repo scripts from <root>/.lanes/config/script-items/repository
+        // (read once, reused for every repo).
+        let scripts = ScriptItems(shell: services.shell)
+        let repoScripts = ScriptItems.executableFiles(
+            in: LaneFS.repoScriptItemsDir(in: LaneActions.root(of: lane)))
+        let lane = lane
+
         // Read branches per-repo concurrently.
         return await withTaskGroup(of: (Int, any Item).self) { group in
             for (index, repoURL) in repos.enumerated() {
@@ -35,7 +42,8 @@ nonisolated struct RepositoryProvider: LaneProvider {
                         childrenProvider: {
                             Self.actions(repoURL: repoURL, laneID: laneID,
                                          git: git, hosts: hosts, chrome: chrome,
-                                         apps: apps, iterm: iterm)
+                                         apps: apps, iterm: iterm,
+                                         scripts: scripts, repoScripts: repoScripts, lane: lane)
                         }
                     )
                     return (index, item)
@@ -50,7 +58,8 @@ nonisolated struct RepositoryProvider: LaneProvider {
     private static func actions(
         repoURL: URL, laneID: UUID,
         git: GitInspector, hosts: HostResolver, chrome: ChromeController,
-        apps: AppLauncher, iterm: ITermController
+        apps: AppLauncher, iterm: ITermController,
+        scripts: ScriptItems, repoScripts: [URL], lane: Lane
     ) -> [any Item] {
         let path = repoURL.path
         var actions: [any Item] = []
@@ -81,6 +90,9 @@ nonisolated struct RepositoryProvider: LaneProvider {
                                  }))
         actions.append(BasicItem(id: "repo:\(path):finder", title: "Open in Finder", icon: .reveal,
                                  run: { apps.reveal(repoURL); return .dismiss }))
+
+        // Custom per-repo scripts, run with this repo as cwd.
+        actions += scripts.repoItems(scripts: repoScripts, repoURL: repoURL, lane: lane)
         return actions
     }
 }
