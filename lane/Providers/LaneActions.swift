@@ -61,6 +61,21 @@ nonisolated enum LaneActions {
                                    })
                                }))
 
+        let hasSummary = !(lane.summary ?? "").isEmpty
+        items.append(BasicItem(id: "mgmt:describe",
+                               title: hasSummary ? "Edit description…" : "Set description…",
+                               icon: .note,
+                               run: {
+                                   .pushInput(InputRequest(title: "Lane description",
+                                                           placeholder: "One-line description",
+                                                           initialText: lane.summary ?? "") { text in
+                                       // Re-enter the lane so the new description
+                                       // shows immediately in the header.
+                                       let updated = try LaneFS.setSummary(lane, to: text)
+                                       return .enter(updated)
+                                   })
+                               }))
+
         items.append(BasicItem(id: "mgmt:reveal", title: "Reveal in Finder", icon: .reveal,
                                run: { apps.reveal(lane.url); return .dismiss }))
 

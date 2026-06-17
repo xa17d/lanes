@@ -40,14 +40,15 @@ nonisolated enum LaneFS {
         if let meta = JSONFile.read(LaneMeta.self, at: url) {
             return meta
         }
-        let meta = LaneMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil)
+        let meta = LaneMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil, summary: nil)
         try JSONFile.writeAtomic(meta, to: url)
         return meta
     }
 
     private static func lane(at url: URL) throws -> Lane {
         let meta = try loadOrCreateMeta(at: url)
-        return Lane(url: url, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: meta.lastOpenedAt)
+        return Lane(url: url, id: meta.id, createdAt: meta.createdAt,
+                    lastOpenedAt: meta.lastOpenedAt, summary: meta.summary)
     }
 
     // MARK: - Listing
@@ -91,9 +92,9 @@ nonisolated enum LaneFS {
         let dest = root.appendingPathComponent(name, isDirectory: true)
         guard !fm.fileExists(atPath: dest.path) else { throw LaneFSError.alreadyExists(name) }
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        let meta = LaneMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil)
+        let meta = LaneMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil, summary: nil)
         try JSONFile.writeAtomic(meta, to: metaURL(for: dest))
-        return Lane(url: dest, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: nil)
+        return Lane(url: dest, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: nil, summary: nil)
     }
 
     @discardableResult
@@ -101,7 +102,18 @@ nonisolated enum LaneFS {
         var meta = try loadOrCreateMeta(at: lane.url)
         meta.lastOpenedAt = now
         try JSONFile.writeAtomic(meta, to: metaURL(for: lane.url))
-        return Lane(url: lane.url, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: now)
+        return Lane(url: lane.url, id: meta.id, createdAt: meta.createdAt,
+                    lastOpenedAt: now, summary: meta.summary)
+    }
+
+    /// Set (or clear) the lane's one-line description. Returns the updated lane.
+    static func setSummary(_ lane: Lane, to summary: String) throws -> Lane {
+        var meta = try loadOrCreateMeta(at: lane.url)
+        let trimmed = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        meta.summary = trimmed.isEmpty ? nil : trimmed
+        try JSONFile.writeAtomic(meta, to: metaURL(for: lane.url))
+        return Lane(url: lane.url, id: meta.id, createdAt: meta.createdAt,
+                    lastOpenedAt: meta.lastOpenedAt, summary: meta.summary)
     }
 
     static func archive(_ lane: Lane, in root: URL) throws -> Lane {

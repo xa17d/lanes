@@ -13,6 +13,7 @@ nonisolated struct Lane: Identifiable, Hashable, Sendable {
     var id: UUID
     var createdAt: Date
     var lastOpenedAt: Date?
+    var summary: String?         // optional one-line description
 
     var name: String { url.lastPathComponent }                  // = folder name
     var isArchived: Bool {
@@ -26,4 +27,5 @@ nonisolated struct LaneMeta: Codable, Sendable {
     var id: UUID
     var createdAt: Date
     var lastOpenedAt: Date?
+    var summary: String?   // decodes as nil when absent (older files)
 }

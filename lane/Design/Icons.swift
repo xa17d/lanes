@@ -27,6 +27,7 @@ nonisolated enum IconToken: Sendable, Hashable {
     case open
     case reveal
     case manage
+    case note
     case generic
 
     var symbol: String {
@@ -49,6 +50,7 @@ nonisolated enum IconToken: Sendable, Hashable {
         case .open:         return "arrow.right.circle"
         case .reveal:       return "folder"
         case .manage:       return "gearshape"
+        case .note:         return "text.alignleft"
         case .generic:      return "circle"
         }
     }

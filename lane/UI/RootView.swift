@@ -19,6 +19,7 @@ struct RootView: View {
             searchField
             Divider().opacity(0.4)
             Breadcrumb(labels: model.breadcrumb)
+            laneSummary
             LevelView(model: model)
             Footer(hint: hint)
         }
@@ -53,6 +54,21 @@ struct RootView: View {
         }
         .padding(.horizontal, Tokens.Space.l)
         .frame(height: Tokens.Size.searchHeight)
+    }
+
+    /// The active lane's one-line description, shown under the breadcrumb so
+    /// you can tell at a glance which lane you're in.
+    @ViewBuilder private var laneSummary: some View {
+        if let summary = model.currentLane?.summary, !summary.isEmpty {
+            Text(summary)
+                .font(Tokens.Font.subtitle.italic())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Tokens.Space.l)
+                .padding(.bottom, Tokens.Space.s)
+        }
     }
 
     private var fieldPrompt: String {
