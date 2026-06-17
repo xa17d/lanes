@@ -317,7 +317,8 @@ State: `path: [Level]`, `selection: Int`, `query: String`. `Level` holds its ite
 - `↑`/`↓` move selection (wraps optionally; clamp is fine).
 - `Return`: leaf → `await run()` then honor `RunOutcome` (`.dismiss` hides the panel; `.pop` pops; `.stay`). Container → push `children()`. Track row (level 0) → enter track (`library.touch`, push level 1).
 - `→`: container → push children; track row → enter the track (same as `↵`).
-- `←` / `Esc`: pop a level; at level 0, `Esc` hides the panel.
+- `←` / `Esc`: step back one level (`Esc` also cancels input / clears a typed query first); at level 0, `Esc` hides the panel. `Esc` only ever navigates back — it never closes from a deeper level.
+- `⌘W`: close the panel from any depth (the explicit "dismiss", as opposed to `Esc`'s step-back).
 - `⌘R`: reload the current level. `⌘,`: open Settings.
 - Typing filters (see search).
 

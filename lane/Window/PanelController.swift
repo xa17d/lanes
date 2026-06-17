@@ -85,6 +85,7 @@ final class PanelController {
 
         if event.modifierFlags.contains(.command) {
             switch event.charactersIgnoringModifiers {
+            case "w": model.onClose(); return true   // close from any depth (Esc only steps back)
             case "r": model.reloadCurrent(); return true
             case ",": model.onOpenSettings(); return true
             case "n" where model.stack.isEmpty: model.newTrack(); return true
