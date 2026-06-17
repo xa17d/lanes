@@ -32,6 +32,12 @@ item exposes actions that **focus an existing window or launch a new one**.
   non-empty query surfaces nested actions with their breadcrumb
   (`service-api › Open PR`).
 
+## Configuration
+
+Templates, custom actions (script-items), lane descriptions / status badges, and
+lifecycle hooks are all configured by dropping files under `<root>/.lanes/`. See
+**[CONFIGURATION.md](CONFIGURATION.md)** for the full reference.
+
 ## Architecture
 
 Four layers (`Lane` → `Item` → `LaneProvider` → `Services`). Persistence is
