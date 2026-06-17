@@ -25,11 +25,32 @@ nonisolated enum TrackActions {
                   run: { .pushInput(newTrackRequest(root: root)) })
     }
 
-    static func managementItems(for track: Track, root: URL, apps: AppLauncher) -> [any Item] {
+    /// The library root that owns `track`, derived from its location: the
+    /// parent folder, or the grandparent when the track lives under `.archive/`.
+    static func root(of track: Track) -> URL {
+        let parent = track.url.deletingLastPathComponent()
+        return track.isArchived ? parent.deletingLastPathComponent() : parent
+    }
+
+    /// A single "Manage track…" container drilling into the management actions,
+    /// for use from *inside* an already-open track (so "Open" is omitted).
+    static func manageTrackItem(for track: Track, apps: AppLauncher) -> any Item {
+        let root = root(of: track)
+        return BasicItem(id: "track:manage", title: "Manage track…", icon: .manage,
+                         keywords: ["manage", "rename", "archive", "delete", "settings"],
+                         childrenProvider: {
+                             managementItems(for: track, root: root, apps: apps, includeOpen: false)
+                         })
+    }
+
+    static func managementItems(for track: Track, root: URL, apps: AppLauncher,
+                                includeOpen: Bool = true) -> [any Item] {
         var items: [any Item] = []
 
-        items.append(BasicItem(id: "mgmt:open", title: "Open", icon: .open,
-                               run: { .enter(track) }))
+        if includeOpen {
+            items.append(BasicItem(id: "mgmt:open", title: "Open", icon: .open,
+                                   run: { .enter(track) }))
+        }
 
         items.append(BasicItem(id: "mgmt:rename", title: "Rename…", icon: .rename,
                                run: {
