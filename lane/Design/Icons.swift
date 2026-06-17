@@ -9,7 +9,7 @@
 import Foundation
 
 nonisolated enum IconToken: Sendable, Hashable {
-    case folder          // track folder / finder
+    case folder          // lane folder / finder
     case jira
     case repo
     case pullRequest

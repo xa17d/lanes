@@ -8,18 +8,18 @@
 
 import Foundation
 
-nonisolated struct RepositoryProvider: TrackProvider {
+nonisolated struct RepositoryProvider: LaneProvider {
     let section = 1
     var displayName: String { "Repositories" }
 
-    func items(for track: Track, store: TrackStore, services: Services) async -> [any Item] {
-        let repos = services.git.discoverRepos(in: track.url)
+    func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
+        let repos = services.git.discoverRepos(in: lane.url)
         let git = services.git
         let hosts = services.hosts
         let chrome = services.chrome
         let apps = services.apps
         let iterm = services.iterm
-        let trackID = track.id
+        let laneID = lane.id
 
         // Read branches per-repo concurrently.
         return await withTaskGroup(of: (Int, any Item).self) { group in
@@ -33,7 +33,7 @@ nonisolated struct RepositoryProvider: TrackProvider {
                         icon: .repo,
                         keywords: ["repo", "git"],
                         childrenProvider: {
-                            Self.actions(repoURL: repoURL, trackID: trackID,
+                            Self.actions(repoURL: repoURL, laneID: laneID,
                                          git: git, hosts: hosts, chrome: chrome,
                                          apps: apps, iterm: iterm)
                         }
@@ -48,7 +48,7 @@ nonisolated struct RepositoryProvider: TrackProvider {
     }
 
     private static func actions(
-        repoURL: URL, trackID: UUID,
+        repoURL: URL, laneID: UUID,
         git: GitInspector, hosts: HostResolver, chrome: ChromeController,
         apps: AppLauncher, iterm: ITermController
     ) -> [any Item] {
@@ -76,7 +76,7 @@ nonisolated struct RepositoryProvider: TrackProvider {
                                  run: { try apps.open(app: "Visual Studio Code", path: repoURL); return .dismiss }))
         actions.append(BasicItem(id: "repo:\(path):term", title: "Open Terminal here", icon: .terminal,
                                  run: {
-                                     try iterm.openOrCreate(trackID: trackID, tag: "repo:\(path)", cwd: repoURL, command: nil)
+                                     try iterm.openOrCreate(laneID: laneID, tag: "repo:\(path)", cwd: repoURL, command: nil)
                                      return .dismiss
                                  }))
         actions.append(BasicItem(id: "repo:\(path):finder", title: "Open in Finder", icon: .reveal,

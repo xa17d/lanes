@@ -2,7 +2,7 @@
 //  ItemLoader.swift
 //  lane
 //
-//  Streaming loader for a track's top level: runs all providers concurrently,
+//  Streaming loader for a lane's top level: runs all providers concurrently,
 //  yielding each provider's contribution as it returns, with a per-provider
 //  timeout (cancel the task, drop its contribution, flag the timeout).
 //
@@ -16,10 +16,10 @@ nonisolated enum ItemLoader {
     /// (section, title); the stream finishes when every provider has either
     /// returned or timed out.
     static func load(
-        track: Track,
-        store: TrackStore,
+        lane: Lane,
+        store: LaneStore,
         services: Services,
-        providers: [any TrackProvider],
+        providers: [any LaneProvider],
         timeout: Duration = defaultTimeout
     ) -> AsyncStream<ProviderResult> {
         AsyncStream { continuation in
@@ -27,7 +27,7 @@ nonisolated enum ItemLoader {
                 await withTaskGroup(of: ProviderResult.self) { group in
                     for provider in providers {
                         group.addTask {
-                            await runOne(provider, track: track, store: store,
+                            await runOne(provider, lane: lane, store: store,
                                          services: services, timeout: timeout)
                         }
                     }
@@ -47,15 +47,15 @@ nonisolated enum ItemLoader {
     }
 
     private static func runOne(
-        _ provider: any TrackProvider,
-        track: Track,
-        store: TrackStore,
+        _ provider: any LaneProvider,
+        lane: Lane,
+        store: LaneStore,
         services: Services,
         timeout: Duration
     ) async -> ProviderResult {
         let outcome: Race = await withTaskGroup(of: Race.self) { group in
             group.addTask {
-                .done(await provider.items(for: track, store: store, services: services))
+                .done(await provider.items(for: lane, store: store, services: services))
             }
             group.addTask {
                 try? await Task.sleep(for: timeout)

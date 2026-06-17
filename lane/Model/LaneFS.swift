@@ -1,15 +1,15 @@
 //
-//  TrackFS.swift
+//  LaneFS.swift
 //  lane
 //
-//  Pure filesystem operations behind TrackLibrary. Foundation-only and
+//  Pure filesystem operations behind LaneLibrary. Foundation-only and
 //  isolation-free so the rules (discovery, atomic meta, archive collisions,
 //  rename-keeps-id) can be unit-tested directly.
 //
 
 import Foundation
 
-nonisolated enum TrackFSError: LocalizedError {
+nonisolated enum LaneFSError: LocalizedError {
     case alreadyExists(String)
 
     var errorDescription: String? {
@@ -19,35 +19,35 @@ nonisolated enum TrackFSError: LocalizedError {
     }
 }
 
-nonisolated enum TrackFS {
+nonisolated enum LaneFS {
     static let archiveDirName = ".archive"
-    static let metaKey = "track"
+    static let metaKey = "lane"
 
     private static var fm: FileManager { .default }
 
     // MARK: - Meta
 
-    private static func metaURL(for trackURL: URL) -> URL {
-        trackURL
-            .appendingPathComponent(".track", isDirectory: true)
+    private static func metaURL(for laneURL: URL) -> URL {
+        laneURL
+            .appendingPathComponent(".lane", isDirectory: true)
             .appendingPathComponent("\(metaKey).json")
     }
 
-    /// Load a track's meta, creating `track.json` (new UUID, createdAt now) if
+    /// Load a lane's meta, creating `lane.json` (new UUID, createdAt now) if
     /// it is missing.
-    static func loadOrCreateMeta(at trackURL: URL) throws -> TrackMeta {
-        let url = metaURL(for: trackURL)
-        if let meta = JSONFile.read(TrackMeta.self, at: url) {
+    static func loadOrCreateMeta(at laneURL: URL) throws -> LaneMeta {
+        let url = metaURL(for: laneURL)
+        if let meta = JSONFile.read(LaneMeta.self, at: url) {
             return meta
         }
-        let meta = TrackMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil)
+        let meta = LaneMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil)
         try JSONFile.writeAtomic(meta, to: url)
         return meta
     }
 
-    private static func track(at url: URL) throws -> Track {
+    private static func lane(at url: URL) throws -> Lane {
         let meta = try loadOrCreateMeta(at: url)
-        return Track(url: url, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: meta.lastOpenedAt)
+        return Lane(url: url, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: meta.lastOpenedAt)
     }
 
     // MARK: - Listing
@@ -66,14 +66,14 @@ nonisolated enum TrackFS {
         }
     }
 
-    /// All tracks in `root`, sorted by lastOpenedAt desc (nil last), then name.
-    static func tracks(in root: URL, includeArchived: Bool = false) -> [Track] {
+    /// All lanes in `root`, sorted by lastOpenedAt desc (nil last), then name.
+    static func lanes(in root: URL, includeArchived: Bool = false) -> [Lane] {
         var urls = childDirectories(of: root)
         if includeArchived {
             let archive = root.appendingPathComponent(archiveDirName, isDirectory: true)
             urls += childDirectories(of: archive)
         }
-        let loaded = urls.compactMap { try? track(at: $0) }
+        let loaded = urls.compactMap { try? lane(at: $0) }
         return loaded.sorted { a, b in
             switch (a.lastOpenedAt, b.lastOpenedAt) {
             case let (x?, y?): return x == y ? a.name.localizedStandardCompare(b.name) == .orderedAscending : x > y
@@ -86,49 +86,49 @@ nonisolated enum TrackFS {
 
     // MARK: - Mutations
 
-    static func create(name: String, in root: URL) throws -> Track {
+    static func create(name: String, in root: URL) throws -> Lane {
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
         let dest = root.appendingPathComponent(name, isDirectory: true)
-        guard !fm.fileExists(atPath: dest.path) else { throw TrackFSError.alreadyExists(name) }
+        guard !fm.fileExists(atPath: dest.path) else { throw LaneFSError.alreadyExists(name) }
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        let meta = TrackMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil)
+        let meta = LaneMeta(id: UUID(), createdAt: Date(), lastOpenedAt: nil)
         try JSONFile.writeAtomic(meta, to: metaURL(for: dest))
-        return Track(url: dest, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: nil)
+        return Lane(url: dest, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: nil)
     }
 
     @discardableResult
-    static func touch(_ track: Track, now: Date = Date()) throws -> Track {
-        var meta = try loadOrCreateMeta(at: track.url)
+    static func touch(_ lane: Lane, now: Date = Date()) throws -> Lane {
+        var meta = try loadOrCreateMeta(at: lane.url)
         meta.lastOpenedAt = now
-        try JSONFile.writeAtomic(meta, to: metaURL(for: track.url))
-        return Track(url: track.url, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: now)
+        try JSONFile.writeAtomic(meta, to: metaURL(for: lane.url))
+        return Lane(url: lane.url, id: meta.id, createdAt: meta.createdAt, lastOpenedAt: now)
     }
 
-    static func archive(_ track: Track, in root: URL) throws -> Track {
+    static func archive(_ lane: Lane, in root: URL) throws -> Lane {
         let archiveDir = root.appendingPathComponent(archiveDirName, isDirectory: true)
         try fm.createDirectory(at: archiveDir, withIntermediateDirectories: true)
-        let dest = uniqueDestination(in: archiveDir, base: track.name)
-        try fm.moveItem(at: track.url, to: dest)
-        return try self.track(at: dest)
+        let dest = uniqueDestination(in: archiveDir, base: lane.name)
+        try fm.moveItem(at: lane.url, to: dest)
+        return try self.lane(at: dest)
     }
 
-    static func unarchive(_ track: Track, in root: URL) throws -> Track {
-        let dest = uniqueDestination(in: root, base: track.name)
-        try fm.moveItem(at: track.url, to: dest)
-        return try self.track(at: dest)
+    static func unarchive(_ lane: Lane, in root: URL) throws -> Lane {
+        let dest = uniqueDestination(in: root, base: lane.name)
+        try fm.moveItem(at: lane.url, to: dest)
+        return try self.lane(at: dest)
     }
 
-    static func rename(_ track: Track, to name: String) throws -> Track {
-        let parent = track.url.deletingLastPathComponent()
+    static func rename(_ lane: Lane, to name: String) throws -> Lane {
+        let parent = lane.url.deletingLastPathComponent()
         let dest = parent.appendingPathComponent(name, isDirectory: true)
-        guard !fm.fileExists(atPath: dest.path) else { throw TrackFSError.alreadyExists(name) }
-        try fm.moveItem(at: track.url, to: dest)
-        // id in track.json keeps identity; reload at the new url.
-        return try self.track(at: dest)
+        guard !fm.fileExists(atPath: dest.path) else { throw LaneFSError.alreadyExists(name) }
+        try fm.moveItem(at: lane.url, to: dest)
+        // id in lane.json keeps identity; reload at the new url.
+        return try self.lane(at: dest)
     }
 
-    static func delete(_ track: Track) throws {
-        try fm.removeItem(at: track.url)
+    static func delete(_ lane: Lane) throws {
+        try fm.removeItem(at: lane.url)
     }
 
     // MARK: - Helpers

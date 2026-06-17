@@ -9,9 +9,9 @@
 import Foundation
 
 nonisolated struct ProviderRegistry: Sendable {
-    let providers: [any TrackProvider]
+    let providers: [any LaneProvider]
 
-    init(providers: [any TrackProvider]) {
+    init(providers: [any LaneProvider]) {
         self.providers = providers.sorted { $0.section < $1.section }
     }
 
@@ -21,6 +21,6 @@ nonisolated struct ProviderRegistry: Sendable {
         RepositoryProvider(),
         FolderProvider(),
         AgentsProvider(),
-        TrackManagementProvider(),
+        LaneManagementProvider(),
     ])
 }

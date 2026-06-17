@@ -3,7 +3,7 @@
 //  lane
 //
 //  Pretty-printed, sorted-keys, ISO8601 JSON with atomic writes. Shared by
-//  track.json and provider state files.
+//  lane.json and provider state files.
 //
 
 import Foundation

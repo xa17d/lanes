@@ -3,8 +3,8 @@
 //  lane
 //
 //  The navigation + search view model. Owns the level stack, selection, and
-//  query, and drives streaming loads. Level 0 (the track list) is implicit:
-//  when `stack` is empty we show tracks; otherwise we show `stack.last`.
+//  query, and drives streaming loads. Level 0 (the lane list) is implicit:
+//  when `stack` is empty we show lanes; otherwise we show `stack.last`.
 //
 
 import Foundation
@@ -12,13 +12,13 @@ import Combine
 
 @MainActor
 final class LaneModel: ObservableObject {
-    let library: TrackLibrary
+    let library: LaneLibrary
     let services: Services
     let registry: ProviderRegistry
     var onClose: () -> Void = {}
     var onOpenSettings: () -> Void = {}
 
-    @Published var tracks: [Track] = []
+    @Published var lanes: [Lane] = []
     @Published var stack: [LevelState] = []
     @Published var query: String = "" { didSet { selection = 0 } }
     @Published var inputText: String = ""
@@ -27,7 +27,7 @@ final class LaneModel: ObservableObject {
     @Published var includeArchived = false
     @Published var panelAppeared = false
 
-    init(library: TrackLibrary, services: Services, registry: ProviderRegistry) {
+    init(library: LaneLibrary, services: Services, registry: ProviderRegistry) {
         self.library = library
         self.services = services
         self.registry = registry
@@ -35,46 +35,46 @@ final class LaneModel: ObservableObject {
 
     // MARK: - Lifecycle
 
-    /// Hard reset to the root track list. Used on first launch and as the
+    /// Hard reset to the root lane list. Used on first launch and as the
     /// fallback when the level we were on is no longer valid.
     func reset() {
         stack = []
         query = ""
         selection = 0
-        reloadTracks()
+        reloadLanes()
     }
 
     /// Called when the panel is re-shown via the hotkey. Returns you to where
     /// you left off (the navigation stack is kept in memory, so this only holds
     /// within a single process — a restart starts with an empty stack = root).
     /// Refreshes the root list for external changes, and falls back to the root
-    /// if the track we were inside has since vanished on disk.
+    /// if the lane we were inside has since vanished on disk.
     func reopen() {
-        if let track = currentTrack,
-           !FileManager.default.fileExists(atPath: track.url.path) {
+        if let lane = currentLane,
+           !FileManager.default.fileExists(atPath: lane.url.path) {
             reset()
             return
         }
         if stack.isEmpty {
-            reloadTracks()      // pick up external add / rename / delete
+            reloadLanes()      // pick up external add / rename / delete
         }
         if !rows.indices.contains(selection) { selection = 0 }
     }
 
-    func reloadTracks() {
-        tracks = library.tracks(includeArchived: includeArchived)
+    func reloadLanes() {
+        lanes = library.lanes(includeArchived: includeArchived)
     }
 
-    /// Toggle archived tracks in the level-0 list (so they can be unarchived).
+    /// Toggle archived lanes in the level-0 list (so they can be unarchived).
     func toggleArchived() {
         guard stack.isEmpty else { return }
         includeArchived.toggle()
         selection = 0
-        reloadTracks()
+        reloadLanes()
     }
 
     var currentLevel: LevelState? { stack.last }
-    var currentTrack: Track? { stack.first?.track }
+    var currentLane: Lane? { stack.first?.lane }
 
     var breadcrumb: [String] { stack.compactMap(\.titleSegment) }
 
@@ -93,32 +93,32 @@ final class LaneModel: ObservableObject {
     var rows: [DisplayRow] {
         if isInputMode { return [] }
         if stack.isEmpty {
-            return trackRows()
+            return laneRows()
         } else {
             return itemRows(for: stack[stack.count - 1])
         }
     }
 
-    private func trackRows() -> [DisplayRow] {
-        let matched: [Track]
+    private func laneRows() -> [DisplayRow] {
+        let matched: [Lane]
         if query.isEmpty {
-            matched = tracks
+            matched = lanes
         } else {
-            matched = tracks
-                .compactMap { t -> (Track, Double)? in
+            matched = lanes
+                .compactMap { t -> (Lane, Double)? in
                     FuzzyMatcher.score(query: query, title: t.name).map { (t, $0) }
                 }
                 .sorted { $0.1 > $1.1 }
                 .map(\.0)
         }
         var rows = matched.map { t in
-            DisplayRow(id: "track:\(t.id)", title: t.name,
+            DisplayRow(id: "lane:\(t.id)", title: t.name,
                        subtitle: t.isArchived ? "archived" : nil,
-                       icon: .folder, pathLabels: [], payload: .track(t))
+                       icon: .folder, pathLabels: [], payload: .lane(t))
         }
-        // "New track…" is always last.
+        // "New lane…" is always last.
         if let root = library.root {
-            rows.append(DisplayRow(item: TrackActions.newTrackItem(root: root), pathLabels: []))
+            rows.append(DisplayRow(item: LaneActions.newLaneItem(root: root), pathLabels: []))
         }
         return rows
     }
@@ -154,18 +154,18 @@ final class LaneModel: ObservableObject {
     func activateSelected() {
         guard let row = selectedRow else { return }
         switch row.payload {
-        case .track(let t): enter(track: t)
+        case .lane(let t): enter(lane: t)
         case .item(let item): activate(item: item)
         }
     }
 
-    /// Right arrow: enter a track or a container. (Management lives inside the
-    /// track as the "Manage track…" item, so → on a track behaves like Enter
+    /// Right arrow: enter a lane or a container. (Management lives inside the
+    /// lane as the "Manage lane…" item, so → on a lane behaves like Enter
     /// rather than opening a separate menu.)
     func drillRight() {
         guard let row = selectedRow else { return }
         switch row.payload {
-        case .track(let t): enter(track: t)
+        case .lane(let t): enter(lane: t)
         case .item(let item): activate(item: item)
         }
     }
@@ -182,14 +182,14 @@ final class LaneModel: ObservableObject {
         }
     }
 
-    func newTrack() {
+    func newLane() {
         guard let root = library.root else {
             showToast("Set a root folder in Settings (⌘,) first.", kind: .error)
             return
         }
         // Carry whatever was typed in the search field into the name field as
         // a starting suggestion.
-        pushInput(TrackActions.newTrackRequest(root: root), seed: query)
+        pushInput(LaneActions.newLaneRequest(root: root), seed: query)
     }
 
     func pop() {
@@ -197,26 +197,26 @@ final class LaneModel: ObservableObject {
         stack.removeLast()
         query = ""
         selection = 0
-        if stack.isEmpty { reloadTracks() }
+        if stack.isEmpty { reloadLanes() }
     }
 
     func reloadCurrent() {
         if stack.isEmpty {
-            reloadTracks()
+            reloadLanes()
         } else if let level = stack.last {
             if let source = level.sourceItem {
                 load(children: source, intoLevel: level.id)
             } else {
-                loadTrackLevel(levelID: level.id)
+                loadLaneLevel(levelID: level.id)
             }
         }
     }
 
     private func activate(item: any Item) {
         if let run = item.run {
-            // For "New track…", seed the name field with the current query so
-            // a search that found nothing becomes the new track's name.
-            let seed = item.id == "track:new" ? query : nil
+            // For "New lane…", seed the name field with the current query so
+            // a search that found nothing becomes the new lane's name.
+            let seed = item.id == "lane:new" ? query : nil
             Task {
                 do { honor(try await run(), seed: seed) }
                 catch { showToast(error.localizedDescription, kind: .error) }
@@ -248,9 +248,9 @@ final class LaneModel: ObservableObject {
             stack = []
             query = ""
             selection = 0
-            reloadTracks()
-        case .enter(let track):
-            enter(track: track)
+            reloadLanes()
+        case .enter(let lane):
+            enter(lane: lane)
         case .pushInput(let request):
             pushInput(request, seed: seed)
         case .pushItems(let title, let items):
@@ -260,7 +260,7 @@ final class LaneModel: ObservableObject {
 
     private func pushInput(_ request: InputRequest, seed: String? = nil) {
         var level = LevelState(kind: .input(request), titleSegment: request.title)
-        level.track = currentTrack
+        level.lane = currentLane
         stack.append(level)
         // A request with prefilled text (e.g. Rename) wins; otherwise fall back
         // to the seed (the carried-over search query) if there is one.
@@ -275,7 +275,7 @@ final class LaneModel: ObservableObject {
 
     private func pushItems(title: String, items: [any Item]) {
         var level = LevelState(kind: .items, titleSegment: title)
-        level.track = currentTrack
+        level.lane = currentLane
         level.items = items
         stack.append(level)
         query = ""
@@ -286,21 +286,21 @@ final class LaneModel: ObservableObject {
 
     // MARK: - Navigation
 
-    func enter(track: Track) {
-        let touched = library.touch(track)
+    func enter(lane: Lane) {
+        let touched = library.touch(lane)
         var level = LevelState(kind: .items, titleSegment: touched.name)
-        level.track = touched
+        level.lane = touched
         level.isLoading = true
         stack = [level]
         query = ""
         selection = 0
-        loadTrackLevel(levelID: level.id)
+        loadLaneLevel(levelID: level.id)
     }
 
     private func push(item: any Item) {
         var level = LevelState(kind: .items, titleSegment: item.title)
         level.sourceItem = item
-        level.track = currentTrack
+        level.lane = currentLane
         level.isLoading = true
         stack.append(level)
         query = ""
@@ -310,15 +310,15 @@ final class LaneModel: ObservableObject {
 
     // MARK: - Loading
 
-    private func loadTrackLevel(levelID: UUID) {
-        guard let track = currentTrack else { return }
+    private func loadLaneLevel(levelID: UUID) {
+        guard let lane = currentLane else { return }
         let token = UUID()
         mutate(levelID) { $0.loadToken = token; $0.isLoading = true; $0.items = []; $0.providerResults = []; $0.indexBuilt = false }
-        let store = TrackStore(track: track)
+        let store = LaneStore(lane: lane)
         let providers = registry.providers
         let services = services
         Task {
-            let stream = ItemLoader.load(track: track, store: store, services: services, providers: providers)
+            let stream = ItemLoader.load(lane: lane, store: store, services: services, providers: providers)
             var timedOut: [String] = []
             for await result in stream {
                 guard isCurrentToken(levelID, token) else { return }
@@ -392,7 +392,7 @@ struct LevelState: Identifiable {
     let kind: Kind
     let titleSegment: String?
 
-    var track: Track?
+    var lane: Lane?
     var sourceItem: (any Item)?
     var items: [any Item] = []
     var providerResults: [ProviderResult] = []
@@ -411,7 +411,7 @@ struct DisplayRow: Identifiable {
     let payload: Payload
 
     enum Payload {
-        case track(Track)
+        case lane(Lane)
         case item(any Item)
     }
 

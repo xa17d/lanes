@@ -52,7 +52,7 @@ nonisolated struct GitInspector: Sendable {
     private let gitPath = "/usr/bin/git"
 
     /// Depth-limited walk; a directory containing `.git` is a repo. Skips dot
-    /// folders (incl. `.track`/`.git`) and does not descend into a found repo.
+    /// folders (incl. `.lane`/`.git`) and does not descend into a found repo.
     func discoverRepos(in root: URL, maxDepth: Int = 4) -> [URL] {
         let fm = FileManager.default
         var repos: [URL] = []

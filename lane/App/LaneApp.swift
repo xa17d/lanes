@@ -2,7 +2,7 @@
 //  LaneApp.swift
 //  lane
 //
-//  Keyboard-first macOS launcher for switching between parallel work tracks.
+//  Keyboard-first macOS launcher for switching between parallel work lanes.
 //
 
 import SwiftUI

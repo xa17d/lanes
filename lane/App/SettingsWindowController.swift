@@ -12,10 +12,10 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController {
-    private let library: TrackLibrary
+    private let library: LaneLibrary
     private var window: NSWindow?
 
-    init(library: TrackLibrary) {
+    init(library: LaneLibrary) {
         self.library = library
     }
 

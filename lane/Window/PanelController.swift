@@ -88,7 +88,7 @@ final class PanelController {
             case "w": model.onClose(); return true   // close from any depth (Esc only steps back)
             case "r": model.reloadCurrent(); return true
             case ",": model.onOpenSettings(); return true
-            case "n" where model.stack.isEmpty: model.newTrack(); return true
+            case "n" where model.stack.isEmpty: model.newLane(); return true
             case "A" where model.stack.isEmpty: model.toggleArchived(); return true
             default: return false
             }

@@ -10,7 +10,7 @@ import AppKit
 import KeyboardShortcuts
 
 struct SettingsView: View {
-    @ObservedObject var library: TrackLibrary
+    @ObservedObject var library: LaneLibrary
     @AppStorage(SettingsKeys.jiraBaseURL) private var jiraBaseURL = ""
 
     var body: some View {
@@ -25,7 +25,7 @@ struct SettingsView: View {
                     Spacer()
                     Button("Choose…") { chooseRoot() }
                 }
-                Text("Every visible folder inside the root is a track.")
+                Text("Every visible folder inside the root is a lane.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -63,7 +63,7 @@ struct SettingsView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose"
-        panel.message = "Choose the folder that holds your tracks."
+        panel.message = "Choose the folder that holds your lanes."
         if let current = library.root { panel.directoryURL = current }
         if panel.runModal() == .OK, let url = panel.url {
             library.setRoot(url)

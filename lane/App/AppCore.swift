@@ -12,7 +12,7 @@ import Foundation
 final class AppCore {
     static let shared = AppCore()
 
-    let library = TrackLibrary()
+    let library = LaneLibrary()
     lazy var model = LaneModel(library: library, services: Self.makeServices(), registry: .default)
     lazy var panel = PanelController(model: model)
     lazy var settings = SettingsWindowController(library: library)

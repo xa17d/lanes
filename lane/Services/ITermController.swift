@@ -3,7 +3,7 @@
 //  lane
 //
 //  Find-or-create a tagged iTerm2 session. Sessions are tagged by name with a
-//  stable sentinel «lane:<trackID>:<tag>» so they can be re-focused later.
+//  stable sentinel «lane:<laneID>:<tag>» so they can be re-focused later.
 //
 
 import Foundation
@@ -16,8 +16,8 @@ nonisolated struct ITermController: Sendable {
     /// Find a session whose name contains the sentinel and select it; else
     /// create a window, name it, cd, and run `command` (if any).
     @discardableResult
-    func openOrCreate(trackID: UUID, tag: String, cwd: URL, command: String?) throws -> String {
-        let sentinel = "«lane:\(trackID.uuidString):\(tag)»"
+    func openOrCreate(laneID: UUID, tag: String, cwd: URL, command: String?) throws -> String {
+        let sentinel = "«lane:\(laneID.uuidString):\(tag)»"
         let source = Self.script
             .replacingOccurrences(of: "%SENTINEL%", with: AppleScriptEscaping.quote(sentinel))
             .replacingOccurrences(of: "%CWD%", with: AppleScriptEscaping.quote(cwd.path))

@@ -12,8 +12,8 @@ nonisolated enum RunOutcome: Sendable {
     case dismiss                                   // close the panel (most launch actions)
     case stay                                      // keep panel open (e.g. after a refresh)
     case pop                                       // pop one level, reload destination
-    case popToRoot                                 // pop to the track list (after archive/rename/delete)
-    case enter(Track)                              // reset to level 0 and enter this track
+    case popToRoot                                 // pop to the lane list (after archive/rename/delete)
+    case enter(Lane)                              // reset to level 0 and enter this lane
     case pushInput(InputRequest)                   // push a single-field input level
     case pushItems(title: String, items: [any Item])  // push a pre-built level (menus, confirms)
 }

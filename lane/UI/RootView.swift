@@ -57,8 +57,8 @@ struct RootView: View {
 
     private var fieldPrompt: String {
         if let request = model.currentInputRequest { return request.placeholder }
-        if model.stack.isEmpty { return "Search tracks…" }
-        return "Search \(model.currentTrack?.name ?? "")…"
+        if model.stack.isEmpty { return "Search lanes…" }
+        return "Search \(model.currentLane?.name ?? "")…"
     }
 
     private var hint: String {

@@ -1,6 +1,6 @@
 # Lane — Implementation Plan
 
-A keyboard-first macOS launcher for switching between parallel work *tracks*. Each track is a folder; inside it live repos and linked Jira tickets, and every item exposes actions that **focus an existing window or launch a new one**.
+A keyboard-first macOS launcher for switching between parallel work *lanes*. Each lane is a folder; inside it live repos and linked Jira tickets, and every item exposes actions that **focus an existing window or launch a new one**.
 
 This document is the complete build spec. Every prior open question is resolved into a decision below; an agent should be able to implement it end to end without further design input. "Lane" is the working title — rename freely, but keep the iTerm session sentinel (below) stable once shipped.
 
@@ -22,8 +22,8 @@ This document is the complete build spec. Every prior open question is resolved 
 Lane/
   App/            LaneApp.swift, AppDelegate, StatusItem, hotkey wiring
   Window/         PanelController (NSPanel), PanelHostingView
-  Model/          Track, TrackLibrary, TrackStore, Item, BasicItem
-  Providers/      TrackProvider, ProviderRegistry, Jira/Repository/Folder/Agents providers
+  Model/          Lane, LaneLibrary, LaneStore, Item, BasicItem
+  Providers/      LaneProvider, ProviderRegistry, Jira/Repository/Folder/Agents providers
   Services/       Shell, GitInspector, HostAdapter(+impls), ChromeController, ITermController, AppLauncher, Permissions
   Search/         FuzzyMatcher, SubtreeIndex
   UI/             RootView, LevelView, RowView, Breadcrumb, Footer, Toast, InputView, Settings
@@ -36,12 +36,12 @@ Lane/
 
 Four layers; nothing below couples to anything above it.
 
-- **Track** — a self-contained folder. Identity, name, archived-state, and working dir are all derived from the folder's location/name; only a tiny meta file plus provider files are persisted, all inside `.track/`.
+- **Lane** — a self-contained folder. Identity, name, archived-state, and working dir are all derived from the folder's location/name; only a tiny meta file plus provider files are persisted, all inside `.lane/`.
 - **Item** — the one universal node. Optional `run` (leaf = action) and `children()` (container). Actions are just leaf items. A provider owns its entire subtree; there is **no cross-provider attachment** and **no capability system**.
-- **TrackProvider** — app-wide, statically registered. Given a track + its store, produces that track's top-level items (and creation actions). The registry fans out providers only at the track's top level; below that, each item yields its own children.
+- **LaneProvider** — app-wide, statically registered. Given a lane + its store, produces that lane's top-level items (and creation actions). The registry fans out providers only at the lane's top level; below that, each item yields its own children.
 - **Services** — every side effect (shell, git, browser, terminal, launchers) lives here and is injected into providers.
 
-Navigation is a stack: level 0 is the Track list (special — a Track is the persistence unit, not an Item); level 1 is the merged provider output for the entered track; every deeper level is `selectedItem.children()`.
+Navigation is a stack: level 0 is the Lane list (special — a Lane is the persistence unit, not an Item); level 1 is the merged provider output for the entered lane; every deeper level is `selectedItem.children()`.
 
 ---
 
@@ -50,57 +50,57 @@ Navigation is a stack: level 0 is the Track list (special — a Track is the per
 ### On-disk layout
 ```
 <root>/                         ← configurable; the only global setting
-  .archive/                     ← archived track folders are moved here
-    old-feature/  .track/ …
-  PROJ-123-login/               ← a track = a working-dir folder
-    .track/                     ← metadata; never the user's code
-      track.json                ← { "id": UUID, "createdAt": ISO8601, "lastOpenedAt": ISO8601? }
+  .archive/                     ← archived lane folders are moved here
+    old-feature/  .lane/ …
+  PROJ-123-login/               ← a lane = a working-dir folder
+    .lane/                     ← metadata; never the user's code
+      lane.json                ← { "id": UUID, "createdAt": ISO8601, "lastOpenedAt": ISO8601? }
       jira.json                 ← provider-owned, written only if it persists
     service-api/   (.git)       ← repos discovered here
     web-client/    (.git)
 ```
 
 **Decisions:**
-- **Every visible (non-dot) folder in `root` is a track.** No marker required. `.track/` is created lazily on first write. This means dropping an existing project folder into `root` makes it a track instantly.
+- **Every visible (non-dot) folder in `root` is a lane.** No marker required. `.lane/` is created lazily on first write. This means dropping an existing project folder into `root` makes it a lane instantly.
 - **Archived = lives under `.archive/`.** Positional, not a stored flag. Archive = move folder into `.archive/`; unarchive = move back.
 - **Name = folder name. Working dir = the folder itself.** Neither is stored.
-- **`id` (UUID) is kept** in `track.json`. It survives renames and is the stable key for the iTerm session tag (§7) and `lastOpenedAt` ordering.
-- Provider state is one JSON file per provider key inside `.track/` (e.g. `jira.json`). Self-contained: the whole track moves/renames/deletes as a unit.
-- **Atomic writes:** serialize to a temp file in `.track/`, then `FileManager.replaceItemAt`. Pretty-printed, `.sortedKeys`.
+- **`id` (UUID) is kept** in `lane.json`. It survives renames and is the stable key for the iTerm session tag (§7) and `lastOpenedAt` ordering.
+- Provider state is one JSON file per provider key inside `.lane/` (e.g. `jira.json`). Self-contained: the whole lane moves/renames/deletes as a unit.
+- **Atomic writes:** serialize to a temp file in `.lane/`, then `FileManager.replaceItemAt`. Pretty-printed, `.sortedKeys`.
 
 ### Types
 ```swift
-struct Track: Identifiable, Hashable {
-    let url: URL                 // the folder = working dir = the track
+struct Lane: Identifiable, Hashable {
+    let url: URL                 // the folder = working dir = the lane
     var id: UUID
     var createdAt: Date
     var lastOpenedAt: Date?
 
     var name: String { url.lastPathComponent }                         // = folder name
     var isArchived: Bool { url.deletingLastPathComponent().lastPathComponent == ".archive" }
-    var dotTrack: URL { url.appendingPathComponent(".track", isDirectory: true) }
+    var dotLane: URL { url.appendingPathComponent(".lane", isDirectory: true) }
 }
 
-final class TrackStore {                                   // central, scoped to ONE track
-    let track: Track
-    func value<T: Decodable>(_ type: T.Type, _ key: String) -> T?   // reads .track/<key>.json
-    func setValue<T: Encodable>(_ value: T, _ key: String) throws    // atomic write; mkdirs .track
-    func clear(_ key: String) throws                                 // removes .track/<key>.json
+final class LaneStore {                                   // central, scoped to ONE lane
+    let lane: Lane
+    func value<T: Decodable>(_ type: T.Type, _ key: String) -> T?   // reads .lane/<key>.json
+    func setValue<T: Encodable>(_ value: T, _ key: String) throws    // atomic write; mkdirs .lane
+    func clear(_ key: String) throws                                 // removes .lane/<key>.json
 }
 
-final class TrackLibrary: ObservableObject {
+final class LaneLibrary: ObservableObject {
     var root: URL                                          // from UserDefaults; see Settings
-    func tracks(includeArchived: Bool = false) -> [Track]  // list folders, load meta, sort by lastOpenedAt desc
-    func create(name: String) throws -> Track              // mkdir root/<name>, write track.json (new UUID, createdAt now)
-    func touch(_ track: Track)                             // set lastOpenedAt = now (called on enter)
-    func archive(_ track: Track) throws                    // mv → root/.archive/<name>, suffix on collision
-    func unarchive(_ track: Track) throws                  // mv → root/<name>, suffix on collision
-    func rename(_ track: Track, to name: String) throws    // mv folder; id in track.json keeps identity
-    func delete(_ track: Track) throws                     // remove folder
+    func lanes(includeArchived: Bool = false) -> [Lane]  // list folders, load meta, sort by lastOpenedAt desc
+    func create(name: String) throws -> Lane              // mkdir root/<name>, write lane.json (new UUID, createdAt now)
+    func touch(_ lane: Lane)                             // set lastOpenedAt = now (called on enter)
+    func archive(_ lane: Lane) throws                    // mv → root/.archive/<name>, suffix on collision
+    func unarchive(_ lane: Lane) throws                  // mv → root/<name>, suffix on collision
+    func rename(_ lane: Lane, to name: String) throws    // mv folder; id in lane.json keeps identity
+    func delete(_ lane: Lane) throws                     // remove folder
 }
 ```
 
-**Discovery rules:** track listing skips names beginning with `.` (so `.archive` is excluded; archived tracks are the contents of `.archive`). When loading a track, if `track.json` is missing, create it (new UUID, `createdAt = now`). Re-scan `root` every time the panel opens, so external renames/moves are picked up for free. Archive/unarchive collisions append `-2`, `-3`, … to the destination name.
+**Discovery rules:** lane listing skips names beginning with `.` (so `.archive` is excluded; archived lanes are the contents of `.archive`). When loading a lane, if `lane.json` is missing, create it (new UUID, `createdAt = now`). Re-scan `root` every time the panel opens, so external renames/moves are picked up for free. Archive/unarchive collisions append `-2`, `-3`, … to the destination name.
 
 ---
 
@@ -132,9 +132,9 @@ struct BasicItem: Item {                            // the one concrete type pro
     func children() async -> [Item] { await childrenProvider() }
 }
 
-protocol TrackProvider {
+protocol LaneProvider {
     var section: Int { get }                        // ordering of top-level groups
-    func items(for track: Track, store: TrackStore, services: Services) async -> [Item]
+    func items(for lane: Lane, store: LaneStore, services: Services) async -> [Item]
 }
 
 struct Services {                                   // injected once at launch
@@ -149,7 +149,7 @@ struct Services {                                   // injected once at launch
 ```
 
 ### Async streaming loader
-When a track is entered, run all providers concurrently in a `TaskGroup`. Render items as each provider returns; sort by `(section, title)`. Apply a **3 s per-provider timeout** (cancel the task, drop that provider's contribution, surface a toast if it timed out). The slow path is git branch reads — read branches per-repo concurrently inside `RepositoryProvider`. Show a thin loading shimmer row until the first batch arrives; never block the UI.
+When a lane is entered, run all providers concurrently in a `TaskGroup`. Render items as each provider returns; sort by `(section, title)`. Apply a **3 s per-provider timeout** (cancel the task, drop that provider's contribution, surface a toast if it timed out). The slow path is git branch reads — read branches per-repo concurrently inside `RepositoryProvider`. Show a thin loading shimmer row until the first batch arrives; never block the UI.
 
 ---
 
@@ -164,7 +164,7 @@ Static registry order by `section`:
 - **No Jira auth in v1.** Storing the key + opening the browser needs none.
 
 ### `RepositoryProvider` — section 1
-- `services.git.discoverRepos(in: track.url)` → for each repo a **container** item: `id = "repo:<path>"`, title = repo folder name, subtitle = current branch (e.g. `feature/login`), icon `.repo`. `run = nil`.
+- `services.git.discoverRepos(in: lane.url)` → for each repo a **container** item: `id = "repo:<path>"`, title = repo folder name, subtitle = current branch (e.g. `feature/login`), icon `.repo`. `run = nil`.
 - `childrenProvider` builds the action list (all leaves unless noted), each `→ .dismiss`:
   - **Open PR** — only if host recognized → `chrome.openInChrome(prURL)` (§7).
   - **Open CI** — only if host recognized → `chrome.openInChrome(ciURL)`.
@@ -175,17 +175,17 @@ Static registry order by `section`:
   - **Open in Finder** — `apps.reveal(repo.path)`.
 
 ### `FolderProvider` — section 2
-- **Open in Finder** (track.url), **Open Terminal here** (`iterm.openOrCreate(tag: "shell", cwd: track.url, command: nil)`).
+- **Open in Finder** (lane.url), **Open Terminal here** (`iterm.openOrCreate(tag: "shell", cwd: lane.url, command: nil)`).
 
 ### `AgentsProvider` — section 3
-Agents run **per track, at the track root, cross-repo** (the settled decision). Each is a find-or-create on a tagged iTerm session:
-- **Claude** → `iterm.openOrCreate(tag: "claude", cwd: track.url, command: "claude")`, icon `.claude`.
-- **opencode** → `iterm.openOrCreate(tag: "opencode", cwd: track.url, command: "opencode")`, icon `.code`.
+Agents run **per lane, at the lane root, cross-repo** (the settled decision). Each is a find-or-create on a tagged iTerm session:
+- **Claude** → `iterm.openOrCreate(tag: "claude", cwd: lane.url, command: "claude")`, icon `.claude`.
+- **opencode** → `iterm.openOrCreate(tag: "opencode", cwd: lane.url, command: "opencode")`, icon `.code`.
 
-### Track-management actions (inside a track, via "Manage track…")
-Management lives *inside* the track: `TrackManagementProvider` (last section) appends a **"Manage track…"** container to the track's own page, drilling one level deeper into **Rename…** (InputView → `library.rename`), **Reveal in Finder**, **Archive** / **Unarchive** (depending on location), and **Delete** (with a confirm step). These call `TrackFS`/`TrackLibrary` directly. ("Open" is omitted — you're already in the track.)
+### Lane-management actions (inside a lane, via "Manage lane…")
+Management lives *inside* the lane: `LaneManagementProvider` (last section) appends a **"Manage lane…"** container to the lane's own page, drilling one level deeper into **Rename…** (InputView → `library.rename`), **Reveal in Finder**, **Archive** / **Unarchive** (depending on location), and **Delete** (with a confirm step). These call `LaneFS`/`LaneLibrary` directly. ("Open" is omitted — you're already in the lane.)
 
-Both `↵` and `→` on a track row in the list **enter** the track directly (no intermediate management menu). Creating a track lives at the list level as a **"New track…"** action (always last) → InputView → `library.create` → enter it.
+Both `↵` and `→` on a lane row in the list **enter** the lane directly (no intermediate management menu). Creating a lane lives at the list level as a **"New lane…"** action (always last) → InputView → `library.create` → enter it.
 
 ---
 
@@ -200,7 +200,7 @@ struct Shell {
 ```
 
 ### GitInspector
-- `discoverRepos(in:)` — `FileManager` depth-limited walk (max depth 4) of the track folder; a directory containing `.git` is a repo; **skip** `.track`, `.git` contents, and any dot-folder; don't descend into a repo once found.
+- `discoverRepos(in:)` — `FileManager` depth-limited walk (max depth 4) of the lane folder; a directory containing `.git` is a repo; **skip** `.lane`, `.git` contents, and any dot-folder; don't descend into a repo once found.
 - `branch(of:)` — `git -C <repo> rev-parse --abbrev-ref HEAD` (returns `HEAD` when detached → show short SHA from `git -C <repo> rev-parse --short HEAD`).
 - `remote(of:)` — `git -C <repo> remote get-url origin`, then parse:
 
@@ -262,7 +262,7 @@ end tell
 `openInChrome(url:)` — same but always: reuse an exact-URL tab if present, else new tab. (Use `focusOrOpen(urlContaining: url.absoluteString, fallback: url)`.) Decision: **Chrome is the target browser.** If Chrome isn't installed, the AppleScript errors → toast "Google Chrome isn't installed" and fall back to `NSWorkspace.shared.open(url)`.
 
 ### ITermController (verbatim AppleScript)
-Session tag sentinel — keep stable: `«lane:<trackID>:<tag>»`. `openOrCreate(tag:cwd:command:)` finds a session whose name contains the sentinel and selects it; else creates a window, sets the name, `cd`s, and runs `command` (if any).
+Session tag sentinel — keep stable: `«lane:<laneID>:<tag>»`. `openOrCreate(tag:cwd:command:)` finds a session whose name contains the sentinel and selects it; else creates a window, sets the name, `cd`s, and runs `command` (if any).
 ```applescript
 -- SENTINEL = «lane:<uuid>:<tag>»
 tell application "iTerm2"
@@ -315,24 +315,24 @@ The first Apple Event to Chrome/iTerm triggers the macOS Automation prompt. Catc
 ### Navigation & keys
 State: `path: [Level]`, `selection: Int`, `query: String`. `Level` holds its items (loaded async) + a back reference.
 - `↑`/`↓` move selection (wraps optionally; clamp is fine).
-- `Return`: leaf → `await run()` then honor `RunOutcome` (`.dismiss` hides the panel; `.pop` pops; `.stay`). Container → push `children()`. Track row (level 0) → enter track (`library.touch`, push level 1).
-- `→`: container → push children; track row → enter the track (same as `↵`).
+- `Return`: leaf → `await run()` then honor `RunOutcome` (`.dismiss` hides the panel; `.pop` pops; `.stay`). Container → push `children()`. Lane row (level 0) → enter lane (`library.touch`, push level 1).
+- `→`: container → push children; lane row → enter the lane (same as `↵`).
 - `←` / `Esc`: step back one level (`Esc` also cancels input / clears a typed query first); at level 0, `Esc` hides the panel. `Esc` only ever navigates back — it never closes from a deeper level.
 - `⌘W`: close the panel from any depth (the explicit "dismiss", as opposed to `Esc`'s step-back).
 - `⌘R`: reload the current level. `⌘,`: open Settings.
 - Typing filters (see search).
 
 ### Search
-- Level 0: fuzzy-filter track names.
-- Inside a track: **subtree search.** On entering a track, lazily build a flat index of all items and their descendants (depth-first, capped) labeled with their breadcrumb. An empty query shows the current level only; a non-empty query searches the whole subtree so typing "PR" surfaces a nested repo action, shown with its path (e.g. `service-api › Open PR`). Selecting a deep result runs it directly.
+- Level 0: fuzzy-filter lane names.
+- Inside a lane: **subtree search.** On entering a lane, lazily build a flat index of all items and their descendants (depth-first, capped) labeled with their breadcrumb. An empty query shows the current level only; a non-empty query searches the whole subtree so typing "PR" surfaces a nested repo action, shown with its path (e.g. `service-api › Open PR`). Selecting a deep result runs it directly.
 - `FuzzyMatcher`: subsequence match over `title + keywords`, scoring contiguous runs and word-boundary hits higher; case-insensitive. Pure Swift, no dependency.
 
 ### Creation / input flows
-`InputView` is a pushed level containing a single labeled text field + hint, submit on `Return`, cancel on `Esc`. Used by "Link Jira ticket…", "New track…", and "Rename…". Keep it visually identical to a list level (search field morphs into the input) so the keyboard flow never breaks.
+`InputView` is a pushed level containing a single labeled text field + hint, submit on `Return`, cancel on `Esc`. Used by "Link Jira ticket…", "New lane…", and "Rename…". Keep it visually identical to a list level (search field morphs into the input) so the keyboard flow never breaks.
 
 ### Feedback states
 - **Toast:** transient bottom banner inside the panel for action results/errors. Errors are specific and don't apologize ("Google Chrome isn't installed", "Couldn't read this repo — it may have moved"). Auto-dismiss ~2.5 s.
-- **Empty states** invite action: list with no tracks → "No tracks yet. Press ⌘N to create one." Track with no items → "Nothing here yet. Link a Jira ticket or drop a repo into this folder."
+- **Empty states** invite action: list with no lanes → "No lanes yet. Press ⌘N to create one." Lane with no items → "Nothing here yet. Link a Jira ticket or drop a repo into this folder."
 - **Loading:** shimmer rows until the first provider batch lands.
 
 ---
@@ -354,14 +354,14 @@ Selection    background accentColor.opacity(0.14), rounded 8, + 2pt accentColor 
 Footer hint  11, tertiary: "↑↓ navigate · ↵ open · esc back"
 ```
 - **Type pairing** is the deliberate choice: SF Pro for prose, SF Mono for anything that's data (branches, ticket keys). Restrained, native, not templated.
-- **Breadcrumb** above the list, 12 secondary, `Track › Item › …`; truncates head-first.
+- **Breadcrumb** above the list, 12 secondary, `Lane › Item › …`; truncates head-first.
 - **Motion:** 0.12 s ease on selection movement; panel fades + scales 0.98→1 on show. Respect **Reduce Motion** (cross-fade only). Selection is always visibly the keyboard focus.
 - **Dark/Light:** automatic via materials + semantic colors.
 - **Copy:** sentence case, active verbs, one job per element, consistent vocabulary (the label that says "Open PR" produces a toast that says "Opened pull request" or a specific error — never vague).
 
 ### Icon mapping (`IconToken` → SF Symbol)
 ```
-track folder  folder            jira          tag
+lane folder  folder            jira          tag
 repo          chevron.left.forwardslash.chevron.right
 open PR       arrow.triangle.pull               CI    checkmark.seal
 Fork          arrow.triangle.branch             editor  hammer
@@ -387,22 +387,22 @@ A small standard window (`⌘,` or status-item menu):
 0. **Spike / de-risk (do first).** Two throwaway `osascript` files: focus an existing iTerm session by sentinel + create one running `claude`; focus an existing Chrome tab by substring + open a fallback. **Done when** both reliably focus-or-launch by hand.
 1. **Scaffold.** Accessory app, Info.plist, no sandbox, SPM `KeyboardShortcuts`, status item (Settings/Quit), hotkey toggles a placeholder panel. **Done when** the hotkey shows/hides a floating panel.
 2. **Panel.** `NSPanel` + material + `NSHostingView`, centered, autofocus search, Esc/blur hides. **Done when** it looks and behaves like a launcher shell.
-3. **Persistence.** `TrackLibrary` + `TrackStore` + discovery + atomic writes. **Done when** create/list/rename/archive/delete are correct on disk and survive relaunch.
-4. **Domain.** `Item`/`BasicItem`, `TrackProvider`, registry, `Services`, streaming loader with timeouts. **Done when** a dummy provider streams items into a level.
+3. **Persistence.** `LaneLibrary` + `LaneStore` + discovery + atomic writes. **Done when** create/list/rename/archive/delete are correct on disk and survive relaunch.
+4. **Domain.** `Item`/`BasicItem`, `LaneProvider`, registry, `Services`, streaming loader with timeouts. **Done when** a dummy provider streams items into a level.
 5. **Navigation + search UI.** Stack, key handling, fuzzy subtree search, breadcrumb, footer, loading/empty, toast. **Done when** keyboard-only drill-in/out and search across a nested subtree work.
 6. **Services.** Shell, GitInspector, HostAdapter(+impls), ChromeController, ITermController, AppLauncher, permission error mapping. **Done when** each service works in isolation against a real repo/app.
-7. **Providers.** Folder, Repository(+actions), Jira(+link flow), Agents; track-management actions; New track. **Done when** the acceptance flows below pass.
+7. **Providers.** Folder, Repository(+actions), Jira(+link flow), Agents; lane-management actions; New lane. **Done when** the acceptance flows below pass.
 8. **Settings.** Root picker, Jira base URL, hotkey recorder, automation deep-link.
 9. **Visual polish.** Tokens, accent-rail signature, motion + reduce-motion, icon map, copy review.
 10. **Hardening.** Per-provider timeouts, atomic writes, external-rename rescan, archive collision suffixing, error toasts, empty states.
 
 ### Acceptance flows (definition of done)
 - **Open Jira** focuses an already-open ticket tab (substring match), else opens the built URL in Chrome.
-- **Claude** focuses the track's existing session, else creates one at the track root running `claude`.
+- **Claude** focuses the lane's existing session, else creates one at the lane root running `claude`.
 - **Open PR** opens the correct host URL for the repo's current branch; PR/CI are hidden for unrecognized hosts.
 - **Archive** moves the folder into `.archive/`; it disappears from the default list and reappears with "include archived."
-- **Rename** moves the folder; the track keeps its `id` and `lastOpenedAt`.
-- **Search** for a nested action label surfaces and runs it from the track's top level.
+- **Rename** moves the folder; the lane keeps its `id` and `lastOpenedAt`.
+- **Search** for a nested action label surfaces and runs it from the lane's top level.
 - Re-scanning on open reflects folders renamed/added in Finder while the app was idle.
 
 ---

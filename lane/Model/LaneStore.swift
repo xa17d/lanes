@@ -1,22 +1,22 @@
 //
-//  TrackStore.swift
+//  LaneStore.swift
 //  lane
 //
-//  Per-track key/value store: one JSON file per provider key inside `.track/`.
-//  Self-contained, so the whole track moves/renames/deletes as a unit.
+//  Per-lane key/value store: one JSON file per provider key inside `.lane/`.
+//  Self-contained, so the whole lane moves/renames/deletes as a unit.
 //
 
 import Foundation
 
-nonisolated final class TrackStore: Sendable {
-    let track: Track
+nonisolated final class LaneStore: Sendable {
+    let lane: Lane
 
-    init(track: Track) {
-        self.track = track
+    init(lane: Lane) {
+        self.lane = lane
     }
 
     private func url(for key: String) -> URL {
-        track.dotTrack.appendingPathComponent("\(key).json")
+        lane.dotLane.appendingPathComponent("\(key).json")
     }
 
     func value<T: Decodable>(_ type: T.Type, _ key: String) -> T? {

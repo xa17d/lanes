@@ -2,7 +2,7 @@
 //  Breadcrumb.swift
 //  lane
 //
-//  Track › Item › … path above the list. Truncates head-first.
+//  Lane › Item › … path above the list. Truncates head-first.
 //
 
 import SwiftUI

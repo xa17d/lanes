@@ -14,11 +14,11 @@ nonisolated struct JiraLink: Codable, Sendable {
     let urlOverride: URL?
 }
 
-nonisolated struct JiraProvider: TrackProvider {
+nonisolated struct JiraProvider: LaneProvider {
     let section = 0
     var displayName: String { "Jira" }
 
-    func items(for track: Track, store: TrackStore, services: Services) async -> [any Item] {
+    func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
         let links = store.value([JiraLink].self, "jira") ?? []
         let chrome = services.chrome
         let baseURL = services.jiraBaseURL
@@ -53,7 +53,7 @@ nonisolated struct JiraProvider: TrackProvider {
         return items
     }
 
-    private static func linkRequest(store: TrackStore) -> InputRequest {
+    private static func linkRequest(store: LaneStore) -> InputRequest {
         InputRequest(title: "Link Jira ticket", placeholder: "PROJ-123 or paste a URL") { text in
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let match = trimmed.firstMatch(of: /[A-Z][A-Z0-9]+-\d+/) else {
