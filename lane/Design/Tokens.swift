@@ -32,7 +32,9 @@ enum Tokens {
 
     enum Font {
         static let title = SwiftUI.Font.system(size: 15, weight: .medium)
+        static let laneTitle = SwiftUI.Font.system(size: 16, weight: .semibold)
         static let subtitle = SwiftUI.Font.system(size: 12)
+        static let badge = SwiftUI.Font.system(size: 11, weight: .semibold)
         static let search = SwiftUI.Font.system(size: 22)
         static let mono = SwiftUI.Font.system(size: 12, design: .monospaced)
         static let footer = SwiftUI.Font.system(size: 11)

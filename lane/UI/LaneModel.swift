@@ -106,15 +106,31 @@ final class LaneModel: ObservableObject {
         } else {
             matched = lanes
                 .compactMap { t -> (Lane, Double)? in
-                    FuzzyMatcher.score(query: query, title: t.name).map { (t, $0) }
+                    // Match against the folder name and the description body +
+                    // status text; keep the best score.
+                    let nameScore = FuzzyMatcher.score(query: query, title: t.name)
+                    let descScore = FuzzyMatcher.score(query, StatusBadge.searchText(from: t.summary))
+                    guard let best = [nameScore, descScore].compactMap({ $0 }).max() else { return nil }
+                    return (t, best)
                 }
                 .sorted { $0.1 > $1.1 }
                 .map(\.0)
         }
-        var rows = matched.map { t in
-            DisplayRow(id: "lane:\(t.id)", title: t.name,
-                       subtitle: t.isArchived ? "archived" : nil,
-                       icon: .folder, pathLabels: [], payload: .lane(t))
+        var rows = matched.map { t -> DisplayRow in
+            // Description big, folder name smaller below; the status badge (if
+            // any) is parsed out of the description.
+            let parsed = StatusBadge.parse(from: t.summary)
+            let hasBody = !parsed.body.isEmpty
+            let title = hasBody ? parsed.body : t.name
+            let subtitle: String?
+            if hasBody {
+                subtitle = t.isArchived ? "\(t.name) · archived" : t.name
+            } else {
+                subtitle = t.isArchived ? "archived" : nil
+            }
+            return DisplayRow(id: "lane:\(t.id)", title: title, subtitle: subtitle,
+                              icon: .folder, pathLabels: [], badge: parsed.badge,
+                              payload: .lane(t))
         }
         // "New lane…" is always last.
         if let root = library.root {
@@ -408,6 +424,7 @@ struct DisplayRow: Identifiable {
     let subtitle: String?
     let icon: IconToken
     let pathLabels: [String]
+    let badge: StatusBadge?
     let payload: Payload
 
     enum Payload {
@@ -420,12 +437,21 @@ struct DisplayRow: Identifiable {
         return true
     }
 
-    init(id: String, title: String, subtitle: String?, icon: IconToken, pathLabels: [String], payload: Payload) {
+    /// Lane rows render with a larger title (the description) over a smaller
+    /// secondary line (the folder name).
+    var isLane: Bool {
+        if case .lane = payload { return true }
+        return false
+    }
+
+    init(id: String, title: String, subtitle: String?, icon: IconToken,
+         pathLabels: [String], badge: StatusBadge? = nil, payload: Payload) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
         self.icon = icon
         self.pathLabels = pathLabels
+        self.badge = badge
         self.payload = payload
     }
 
@@ -435,6 +461,7 @@ struct DisplayRow: Identifiable {
         self.subtitle = item.subtitle
         self.icon = item.icon
         self.pathLabels = pathLabels
+        self.badge = nil
         self.payload = .item(item)
     }
 }

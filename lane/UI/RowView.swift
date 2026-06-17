@@ -23,13 +23,17 @@ struct RowView: View {
                 titleLine
                 if let subtitle = row.subtitle {
                     Text(subtitle)
-                        .font(Tokens.Font.mono)
+                        .font(row.isLane ? Tokens.Font.subtitle : Tokens.Font.mono)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
 
             Spacer(minLength: Tokens.Space.s)
+
+            if let badge = row.badge {
+                StatusBadgeView(badge: badge)
+            }
 
             if row.isContainer {
                 Image(systemName: "chevron.right")
@@ -54,7 +58,7 @@ struct RowView: View {
             Text(row.title)
                 .foregroundStyle(.primary)
         }
-        .font(Tokens.Font.title)
+        .font(row.isLane ? Tokens.Font.laneTitle : Tokens.Font.title)
         .lineLimit(1)
     }
 
@@ -72,6 +76,43 @@ struct RowView: View {
                 .fill(Color.accentColor)
                 .frame(width: 2, height: 22)
                 .padding(.leading, Tokens.Space.xs)
+        }
+    }
+}
+
+/// A colored status pill parsed from a lane's `{{color:text}}` description
+/// marker. An empty label renders as a bare colored dot.
+struct StatusBadgeView: View {
+    let badge: StatusBadge
+
+    var body: some View {
+        let color = Self.color(for: badge.color)
+        Group {
+            if badge.text.isEmpty {
+                Circle().fill(color).frame(width: 8, height: 8)
+            } else {
+                Text(badge.text)
+                    .font(Tokens.Font.badge)
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                    .padding(.horizontal, Tokens.Space.s)
+                    .padding(.vertical, 2)
+                    .background(color.opacity(0.16), in: Capsule())
+            }
+        }
+        .fixedSize()
+    }
+
+    static func color(for status: StatusColor) -> Color {
+        switch status {
+        case .gray:   return .gray
+        case .blue:   return .blue
+        case .green:  return .green
+        case .yellow: return .yellow
+        case .orange: return .orange
+        case .red:    return .red
+        case .purple: return .purple
+        case .pink:   return .pink
         }
     }
 }
