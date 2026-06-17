@@ -35,15 +35,20 @@ struct LevelView: View {
     }
 
     private func list(_ rows: [DisplayRow]) -> some View {
-        ScrollViewReader { proxy in
+        // Identity is the row's stable id for both ForEach diffing and
+        // scrollTo. (Adding a separate positional .id(index) here fights the
+        // ForEach identity and leaves ghost / wrong-level rows.)
+        let selectedID = rows.indices.contains(model.selection) ? rows[model.selection].id : nil
+        return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                        RowView(row: row, isSelected: index == model.selection)
-                            .id(index)
+                    ForEach(rows) { row in
+                        RowView(row: row, isSelected: row.id == selectedID)
                             .onTapGesture {
-                                model.selection = index
-                                model.activateSelected()
+                                if let idx = rows.firstIndex(where: { $0.id == row.id }) {
+                                    model.selection = idx
+                                    model.activateSelected()
+                                }
                             }
                     }
                 }
@@ -52,11 +57,12 @@ struct LevelView: View {
             .frame(maxHeight: Tokens.Size.panelMaxHeight)
             .fixedSize(horizontal: false, vertical: true)
             .onChange(of: model.selection) { _, newValue in
+                let id = rows.indices.contains(newValue) ? rows[newValue].id : nil
                 if reduceMotion {
-                    proxy.scrollTo(newValue, anchor: .center)
+                    proxy.scrollTo(id, anchor: .center)
                 } else {
                     withAnimation(.easeOut(duration: 0.12)) {
-                        proxy.scrollTo(newValue, anchor: .center)
+                        proxy.scrollTo(id, anchor: .center)
                     }
                 }
             }

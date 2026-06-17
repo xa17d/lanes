@@ -49,12 +49,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     static func openSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        // macOS 14+ renamed the selector from Preferences to Settings.
-        if NSApp.responds(to: Selector(("showSettingsWindow:"))) {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        } else {
-            NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-        }
+        AppCore.shared.settings.show()
     }
 }

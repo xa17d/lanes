@@ -15,6 +15,7 @@ final class AppCore {
     let library = TrackLibrary()
     lazy var model = LaneModel(library: library, services: Self.makeServices(), registry: .default)
     lazy var panel = PanelController(model: model)
+    lazy var settings = SettingsWindowController(library: library)
 
     private init() {}
 
