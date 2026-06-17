@@ -64,17 +64,15 @@ nonisolated struct RepositoryProvider: LaneProvider {
         let path = repoURL.path
         var actions: [any Item] = []
 
-        // PR/CI only when the host is recognized.
+        // Open PR only when the host is recognized. (Opening CI / GitHub
+        // Actions is no longer built in — it ships as an example script-item;
+        // see examples/script-items/repository.)
         if let remote = git.remote(of: repoURL), let adapter = hosts.adapter(for: remote) {
             let branch = git.branch(of: repoURL) ?? "HEAD"
             let prURL = adapter.prURL(remote, branch: branch)
-            let ciURL = adapter.ciURL(remote, branch: branch)
             actions.append(BasicItem(id: "repo:\(path):pr", title: "Open PR", icon: .pullRequest,
                                      keywords: ["pull", "request", "mr"],
                                      run: { try chrome.openInChrome(url: prURL); return .dismiss }))
-            actions.append(BasicItem(id: "repo:\(path):ci", title: "Open CI", icon: .ci,
-                                     keywords: ["ci", "pipeline", "actions"],
-                                     run: { try chrome.openInChrome(url: ciURL); return .dismiss }))
         }
 
         actions.append(BasicItem(id: "repo:\(path):fork", title: "Open in Fork", icon: .fork,
