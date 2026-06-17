@@ -39,18 +39,14 @@ nonisolated enum TrackActions {
         return BasicItem(id: "track:manage", title: "Manage track…", icon: .manage,
                          keywords: ["manage", "rename", "archive", "delete", "settings"],
                          childrenProvider: {
-                             managementItems(for: track, root: root, apps: apps, includeOpen: false)
+                             managementItems(for: track, root: root, apps: apps)
                          })
     }
 
-    static func managementItems(for track: Track, root: URL, apps: AppLauncher,
-                                includeOpen: Bool = true) -> [any Item] {
+    /// Rename / reveal / archive / delete for a track. Shown from inside the
+    /// track (via "Manage track…"), so it does not include an "Open" action.
+    static func managementItems(for track: Track, root: URL, apps: AppLauncher) -> [any Item] {
         var items: [any Item] = []
-
-        if includeOpen {
-            items.append(BasicItem(id: "mgmt:open", title: "Open", icon: .open,
-                                   run: { .enter(track) }))
-        }
 
         items.append(BasicItem(id: "mgmt:rename", title: "Rename…", icon: .rename,
                                run: {

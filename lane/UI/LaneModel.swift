@@ -159,11 +159,13 @@ final class LaneModel: ObservableObject {
         }
     }
 
-    /// Right arrow: enter containers, or reveal the track-management menu.
+    /// Right arrow: enter a track or a container. (Management lives inside the
+    /// track as the "Manage track…" item, so → on a track behaves like Enter
+    /// rather than opening a separate menu.)
     func drillRight() {
         guard let row = selectedRow else { return }
         switch row.payload {
-        case .track(let t): showManagement(for: t)
+        case .track(let t): enter(track: t)
         case .item(let item): activate(item: item)
         }
     }
@@ -188,12 +190,6 @@ final class LaneModel: ObservableObject {
         // Carry whatever was typed in the search field into the name field as
         // a starting suggestion.
         pushInput(TrackActions.newTrackRequest(root: root), seed: query)
-    }
-
-    private func showManagement(for track: Track) {
-        guard let root = library.root else { return }
-        let items = TrackActions.managementItems(for: track, root: root, apps: services.apps)
-        pushItems(title: track.name, items: items)
     }
 
     func pop() {

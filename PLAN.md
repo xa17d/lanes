@@ -182,10 +182,10 @@ Agents run **per track, at the track root, cross-repo** (the settled decision). 
 - **Claude** → `iterm.openOrCreate(tag: "claude", cwd: track.url, command: "claude")`, icon `.claude`.
 - **opencode** → `iterm.openOrCreate(tag: "opencode", cwd: track.url, command: "opencode")`, icon `.code`.
 
-### Track-management actions (level 0, via `→` on a selected track)
-Pressing `→` (or showing the action menu) on a track row in the list reveals: **Open** (enter), **Rename…** (InputView → `library.rename`), **Reveal in Finder**, **Archive** / **Unarchive** (depending on location), **Delete** (with a confirm step). These call `TrackLibrary` directly. Creating a track lives at the list level as a **"New track…"** action (always last) → InputView → `library.create` → enter it.
+### Track-management actions (inside a track, via "Manage track…")
+Management lives *inside* the track: `TrackManagementProvider` (last section) appends a **"Manage track…"** container to the track's own page, drilling one level deeper into **Rename…** (InputView → `library.rename`), **Reveal in Finder**, **Archive** / **Unarchive** (depending on location), and **Delete** (with a confirm step). These call `TrackFS`/`TrackLibrary` directly. ("Open" is omitted — you're already in the track.)
 
-The same management actions are also reachable from *inside* a track: `TrackManagementProvider` (last section) appends a **"Manage track…"** container to the track's own page, drilling one level deeper into the menu (Open omitted there — you're already in it). The `→` shortcut on the list stays as a power-user fast path.
+Both `↵` and `→` on a track row in the list **enter** the track directly (no intermediate management menu). Creating a track lives at the list level as a **"New track…"** action (always last) → InputView → `library.create` → enter it.
 
 ---
 
@@ -316,7 +316,7 @@ The first Apple Event to Chrome/iTerm triggers the macOS Automation prompt. Catc
 State: `path: [Level]`, `selection: Int`, `query: String`. `Level` holds its items (loaded async) + a back reference.
 - `↑`/`↓` move selection (wraps optionally; clamp is fine).
 - `Return`: leaf → `await run()` then honor `RunOutcome` (`.dismiss` hides the panel; `.pop` pops; `.stay`). Container → push `children()`. Track row (level 0) → enter track (`library.touch`, push level 1).
-- `→`: container → push children; track row → show track-management actions.
+- `→`: container → push children; track row → enter the track (same as `↵`).
 - `←` / `Esc`: pop a level; at level 0, `Esc` hides the panel.
 - `⌘R`: reload the current level. `⌘,`: open Settings.
 - Typing filters (see search).
