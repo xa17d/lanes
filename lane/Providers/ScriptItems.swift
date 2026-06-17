@@ -36,34 +36,34 @@ nonisolated struct ScriptItems: Sendable {
     }
 
     /// Filename → display title: strip a `[sf.symbol]` icon token, drop the
-    /// extension, strip a leading ordering prefix ("10-deploy.sh" → "deploy"),
-    /// and turn -/_ into spaces.
-    static func title(for url: URL) -> String {
-        // Remove the icon token first — it can contain dots, so it must go
-        // before deletingPathExtension (which would otherwise mangle it).
-        var name = url.lastPathComponent
-            .replacingOccurrences(of: "\\[[^\\]]*\\]", with: "", options: .regularExpression)
-        name = (name as NSString).deletingPathExtension
-        name = name.replacingOccurrences(of: "^[0-9]+[-_ ]+", with: "", options: .regularExpression)
-        name = name.replacingOccurrences(of: "[-_]+", with: " ", options: .regularExpression)
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty ? url.lastPathComponent : trimmed
+    /// Filenames follow a fixed three-field format separated by `---`:
+    ///
+    ///     <order>---<name>---<icon>.<ext>
+    ///
+    /// - `order` is a sort key (e.g. `10`), stripped from the display name.
+    /// - `name` is shown verbatim (ordinary dashes/spaces are kept).
+    /// - `icon` is an SF Symbol name (e.g. `bolt.fill`), used for the icon.
+    ///
+    /// The extension is removed first, then the base is split on `---`. A file
+    /// that doesn't match (fewer than three fields) falls back to showing its
+    /// whole base name with the default scroll icon.
+    static func parse(_ url: URL) -> (title: String, icon: IconToken) {
+        let base = (url.lastPathComponent as NSString).deletingPathExtension
+        let parts = base.components(separatedBy: "---")
+        guard parts.count >= 3 else {
+            let fallback = base.trimmingCharacters(in: .whitespaces)
+            return (fallback.isEmpty ? url.lastPathComponent : fallback, .script)
+        }
+        // Tolerate `---` inside the name by joining the middle fields back.
+        let name = parts[1..<(parts.count - 1)].joined(separator: "---")
+            .trimmingCharacters(in: .whitespaces)
+        let iconName = parts[parts.count - 1].trimmingCharacters(in: .whitespaces)
+        return (name.isEmpty ? url.lastPathComponent : name,
+                iconName.isEmpty ? .script : .custom(iconName))
     }
 
-    /// The SF Symbol name from a `[symbol]` token in the filename, e.g.
-    /// `deploy[bolt.fill].sh` → "bolt.fill". Nil when there's no token.
-    static func iconSymbol(for url: URL) -> String? {
-        let name = url.lastPathComponent
-        guard let r = name.range(of: "\\[[^\\]]+\\]", options: .regularExpression) else { return nil }
-        let trimmed = name[r].dropFirst().dropLast().trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
-    /// The icon for a script: its `[symbol]` token if present, else the default
-    /// scroll glyph. (Validity of a custom symbol is checked at render time.)
-    static func icon(for url: URL) -> IconToken {
-        iconSymbol(for: url).map(IconToken.custom) ?? .script
-    }
+    static func title(for url: URL) -> String { parse(url).title }
+    static func icon(for url: URL) -> IconToken { parse(url).icon }
 
     // MARK: - Items
 
@@ -96,10 +96,11 @@ nonisolated struct ScriptItems: Sendable {
     private func item(id: String, scriptURL: URL, cwd: URL, env: [String: String]) -> any Item {
         let shell = self.shell
         let path = scriptURL.path
+        let parsed = Self.parse(scriptURL)
         return BasicItem(
             id: id,
-            title: Self.title(for: scriptURL),
-            icon: Self.icon(for: scriptURL),
+            title: parsed.title,
+            icon: parsed.icon,
             keywords: ["script", "run", scriptURL.lastPathComponent],
             run: {
                 // Silent: exec the file directly so its shebang chooses the

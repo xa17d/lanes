@@ -67,16 +67,28 @@ the launcher.
   (`chmod +x script-items/deploy.sh`). The file is executed directly, so its
   **shebang** chooses the interpreter — bash, zsh, Python, Node, anything.
 - Dotfiles and `README*` are ignored.
-- The action's **title** is the prettified filename: the `[icon]` token (see
-  below) and extension are dropped, a leading ordering prefix is stripped, and
-  `-`/`_` become spaces. So `10-deploy-prod.sh` shows as **deploy prod** (and the
-  `10-` keeps it ordered).
-- The action's **icon** defaults to a scroll. To choose your own, put an
-  [SF Symbol](https://developer.apple.com/sf-symbols/) name in square brackets
-  anywhere in the filename: `deploy[bolt.fill].sh` shows as **deploy** with the
-  `bolt.fill` icon. The brackets delimit the symbol unambiguously (SF Symbol
-  names contain dots), so it works with or without a file extension. An invalid
-  symbol name falls back to the scroll.
+- The filename follows a fixed three-field format, separated by `---`:
+
+  ```
+  <order>---<name>---<icon>.<ext>
+  ```
+
+  - **`order`** is a sort key (e.g. `10`, `20`) — it's stripped from the
+    displayed name and only controls the order actions appear in.
+  - **`name`** is shown **verbatim** — ordinary dashes and spaces are kept, no
+    transformation. (`deploy to prod` stays *deploy to prod*.)
+  - **`icon`** is an [SF Symbol](https://developer.apple.com/sf-symbols/) name
+    (e.g. `bolt.fill`) used as the action's icon. An invalid name falls back to
+    the default scroll glyph.
+
+  So `10---deploy to prod---bolt.fill.sh` shows as **deploy to prod** with the
+  `bolt.fill` icon, ordered by `10`. A file that doesn't use the format (no
+  `---`) just shows its whole base name with the scroll icon.
+
+  > The file extension is removed before parsing, so always include one
+  > (`.sh`, `.py`, …) when your icon name contains dots — otherwise the icon's
+  > last `.segment` is mistaken for the extension. A script with no extension can
+  > still use a single-word icon (`hammer`).
 - Scripts run **silently**. On success the panel just closes; on a **non-zero
   exit** the script's stderr is shown as an error toast. (Use a script that
   opens a terminal/app itself if you want to watch long-running output.)
@@ -95,8 +107,8 @@ Scripts inherit your environment (so `PATH` etc. are intact) plus:
 
 ### Example
 
-`.lanes/config/script-items/open-jira[link].sh` (shows as **open jira** with the
-`link` icon):
+`.lanes/config/script-items/10---open jira---link.sh` (shows as **open jira**
+with the `link` icon):
 
 ```sh
 #!/usr/bin/env bash
@@ -104,7 +116,7 @@ set -euo pipefail
 open "https://jira.example.com/browse/$(basename "$LANE_DIR")"
 ```
 
-`.lanes/config/script-items/repository/fetch[arrow.triangle.2.circlepath].sh`
+`.lanes/config/script-items/repository/10---fetch---arrow.triangle.2.circlepath.sh`
 (shows as **fetch** inside each repo):
 
 ```sh
@@ -114,8 +126,8 @@ git -C "$REPO_DIR" fetch --all --prune
 ```
 
 ```sh
-chmod +x ".lanes/config/script-items/open-jira[link].sh"
-chmod +x ".lanes/config/script-items/repository/fetch[arrow.triangle.2.circlepath].sh"
+chmod +x ".lanes/config/script-items/10---open jira---link.sh"
+chmod +x ".lanes/config/script-items/repository/10---fetch---arrow.triangle.2.circlepath.sh"
 ```
 
 ---
