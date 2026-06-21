@@ -257,7 +257,8 @@ The same mechanism works for singletons:
 For these singletons the **pointer wins** when both a pointer and a local file exist — delete the pointer to fall back to your local version.
 For scripts, local files and pointers simply coexist.
 
-> A `.catalog` pointer whose catalog or item can't be found just shows nothing (for a script) or falls back to local (for a hook/template) — so a removed catalog never breaks the launcher.
+> Removing a catalog in Settings also deletes every `.catalog` pointer that referenced it, so its actions disappear cleanly.
+> And a stray pointer whose catalog or item can't be found just shows nothing (for a script) or falls back to local (for a hook/template) — so a missing catalog never breaks the launcher.
 
 ### Updating
 

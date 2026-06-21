@@ -223,10 +223,32 @@ nonisolated enum Catalogs {
         try JSONFile.writeAtomic(cfg, to: LaneFS.catalogConfigURL(id: id, in: root))
     }
 
-    /// Unsubscribe: delete the catalog (descriptor + checkout). Existing pointer
-    /// files referencing it simply stop resolving.
+    /// Unsubscribe: delete every `.catalog` pointer that referenced the catalog
+    /// (so its actions disappear from the launcher), then delete the catalog
+    /// itself (descriptor + checkout).
     static func remove(id: String, root: URL) throws {
+        removePointers(referencing: id, root: root)
         try fm.removeItem(at: LaneFS.catalogDir(id: id, in: root))
+    }
+
+    /// Delete every `.catalog` pointer targeting catalog `id`, across the script,
+    /// repository-script, and hook config dirs plus the template pointer.
+    static func removePointers(referencing id: String, root: URL) {
+        let dirs = [LaneFS.scriptDir(in: root), LaneFS.repoScriptDir(in: root), LaneFS.hookDir(in: root)]
+        for dir in dirs {
+            guard let entries = try? fm.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+            ) else { continue }
+            for url in entries where isPointer(url) {
+                if JSONFile.read(Pointer.self, at: url)?.catalog == id {
+                    try? fm.removeItem(at: url)
+                }
+            }
+        }
+        let template = LaneFS.templatePointer(in: root)
+        if JSONFile.read(Pointer.self, at: template)?.catalog == id {
+            try? fm.removeItem(at: template)
+        }
     }
 
     // MARK: - Internals
