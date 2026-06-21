@@ -19,8 +19,6 @@ nonisolated struct ProviderRegistry: Sendable {
     static let `default` = ProviderRegistry(providers: [
         TicketProvider(),
         RepositoryProvider(),
-        FolderProvider(),
-        AgentsProvider(),
         ScriptItemsProvider(),
         LaneManagementProvider(),
     ])

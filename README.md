@@ -14,10 +14,9 @@ Each lane is a folder; inside it live repos and linked tickets, and every item e
 - **Inside a lane**, providers contribute actions:
   - **Tickets** — focus an open ticket tab or open it in Chrome; link new tickets (by key like `PROJ-123` or by pasting a URL).
     A base URL set in Settings turns keys into links.
-  - **Repositories** — per repo: Open PR (host-aware) and Open Terminal here (tagged iTerm session).
-    The editor/Finder/CI launchers (Fork, Android Studio, VS Code, Finder, GitHub Actions) ship as ready-to-use example script-items in [`examples/`](examples/) rather than built-ins.
-  - **Folder** — Open Terminal here at the lane root (a Finder launcher is an example script-item).
-  - **Agents** — Claude / opencode in a tagged iTerm session at the lane root.
+  - **Repositories** — one entry per discovered repo (subtitle = current branch); its actions are the per-repo script-items.
+    Open PR (host-aware), Open Terminal here, and the editor/Finder/CI launchers (Fork, Android Studio, VS Code, Finder, GitHub Actions) all ship as ready-to-use example script-items in [`examples/`](examples/) rather than built-ins.
+  - **Agents & terminal** — Open Terminal here, Claude, and opencode (each a tagged iTerm session at the lane root) ship as example lane-level script-items in [`examples/`](examples/).
   - **Scripts** — drop an executable file in `<root>/.lanes/config/script-items/` to add a custom lane action (run with the lane dir as cwd); files under `script-items/repository/` become per-repo actions (run in the repo dir).
     Scripts run silently with `LANE_DIR`/`LANE_NAME`/`LANE_ID`, `TICKET_KEY`/`TICKET_URL` for the lane's primary linked ticket (and `REPO_DIR`/`REPO_NAME` for repo scripts) in the environment; stderr from a failing script is shown as a toast.
     See [`examples/`](examples/) for drop-in scripts.

@@ -50,7 +50,7 @@ Make a file executable and drop it under `.lanes/config/script-items/` to add a 
 
 - **`.lanes/config/script-items/*`** — lane-level actions, shown in a **Scripts** section inside every lane.
   Run with the **lane folder** as the working directory.
-- **`.lanes/config/script-items/repository/*`** — per-repository actions, shown inside each discovered repo (next to *Open PR*, …).
+- **`.lanes/config/script-items/repository/*`** — per-repository actions, shown inside each discovered repo (these are the *only* per-repo actions — Open PR, Open Terminal here, and the editor/CI launchers all ship as examples here).
   Run once per repo with that **repository's folder** as the working directory.
 
 ### Rules
