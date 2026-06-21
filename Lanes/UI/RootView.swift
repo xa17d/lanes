@@ -63,9 +63,6 @@ struct RootView: View {
         let parsed = StatusBadge.parse(from: model.currentLane?.summary)
         if parsed.badge != nil || !parsed.body.isEmpty {
             HStack(spacing: Tokens.Space.s) {
-                if let badge = parsed.badge {
-                    StatusBadgeView(badge: badge)
-                }
                 if !parsed.body.isEmpty {
                     Text(parsed.body)
                         .font(Tokens.Font.subtitle.italic())
@@ -73,7 +70,10 @@ struct RootView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
-                Spacer(minLength: 0)
+                Spacer(minLength: Tokens.Space.s)
+                if let badge = parsed.badge {
+                    StatusBadgeView(badge: badge)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Tokens.Space.l)
