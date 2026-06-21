@@ -27,7 +27,5 @@ final class AppCore {
 }
 
 nonisolated enum SettingsKeys {
-    /// Legacy "jiraBaseURL" string is kept so an already-configured base URL
-    /// survives the rename to generic "ticket" vocabulary.
-    static let ticketBaseURL = "jiraBaseURL"
+    static let ticketBaseURL = "ticketBaseURL"
 }

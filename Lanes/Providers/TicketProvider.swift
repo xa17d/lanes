@@ -18,9 +18,7 @@ nonisolated struct TicketProvider: LaneProvider {
     let section = 0
     var displayName: String { "Tickets" }
 
-    /// Per-lane store key. Kept as the legacy "jira" value so tickets linked
-    /// before the rename to generic "ticket" vocabulary still load.
-    private static let storeKey = "jira"
+    private static let storeKey = "ticket"
 
     func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
         let links = store.value([TicketLink].self, Self.storeKey) ?? []
