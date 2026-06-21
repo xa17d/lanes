@@ -1,15 +1,13 @@
 # Examples
 
-Drop-in examples for the per-root `.lanes/config/` configuration surface. See
-[../CONFIGURATION.md](../CONFIGURATION.md) for the full reference.
+Drop-in examples for the per-root `.lanes/config/` configuration surface.
+See [../CONFIGURATION.md](../CONFIGURATION.md) for the full reference.
 
-Filenames follow the `<order>---<name>---<icon>.<ext>` convention, so each shows
-up with the given name and SF Symbol icon.
+Filenames follow the `<order>---<name>---<icon>.<ext>` convention, so each shows up with the given name and SF Symbol icon.
 
 ## Per-repository actions — `script-items/repository/`
 
-Shown inside each discovered repo, run with the repository folder as the working
-directory (`$REPO_DIR`).
+Shown inside each discovered repo, run with the repository folder as the working directory (`$REPO_DIR`).
 
 | File | Action |
 | ---- | ------ |
@@ -19,14 +17,11 @@ directory (`$REPO_DIR`).
 | `40---Open in VS Code---chevron.left.slash.chevron.right.sh` | Open the repo in VS Code. |
 | `50---Open in Finder---folder.sh` | Reveal the repo in Finder. |
 
-The four launchers (Fork / Android Studio / VS Code / Finder) are the
-script-item replacements for the former built-in repo actions — edit them to fit
-your own toolchain (e.g. swap VS Code for `zed`, Fork for Tower).
+The four launchers (Fork / Android Studio / VS Code / Finder) are the script-item replacements for the former built-in repo actions — edit them to fit your own toolchain (e.g. swap VS Code for `zed`, Fork for Tower).
 
 ## Lane-level actions — `script-items/`
 
-Shown inside every lane, run with the lane folder as the working directory
-(`$LANE_DIR`).
+Shown inside every lane, run with the lane folder as the working directory (`$LANE_DIR`).
 
 | File | Action |
 | ---- | ------ |
@@ -34,11 +29,10 @@ Shown inside every lane, run with the lane folder as the working directory
 
 ## Lifecycle hooks — `hooks/`
 
-Run when a lane is created and on ⌘R, with the lane folder as the working
-directory. When both are present they fire in order — `extract-ticket` first,
-then `update-lane-description` (which then sees `$TICKET_KEY` / `$TICKET_URL`).
-`update-lane-description` also re-runs on its own `{{refresh:…}}` interval. See
-[../CONFIGURATION.md](../CONFIGURATION.md#hooks) for the full reference.
+Run when a lane is created and on ⌘R, with the lane folder as the working directory.
+When both are present they fire in order — `extract-ticket` first, then `update-lane-description` (which then sees `$TICKET_KEY` / `$TICKET_URL`).
+`update-lane-description` also re-runs on its own `{{refresh:…}}` interval.
+See [../CONFIGURATION.md](../CONFIGURATION.md#hooks) for the full reference.
 
 | File | Hook |
 | ---- | ---- |
@@ -47,8 +41,7 @@ then `update-lane-description` (which then sees `$TICKET_KEY` / `$TICKET_URL`).
 
 ## Installing
 
-Copy the files you want into your configured lanes root and keep them
-executable:
+Copy the files you want into your configured lanes root and keep them executable:
 
 ```sh
 ROOT=~/lanes   # your configured root
