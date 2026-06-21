@@ -26,6 +26,9 @@ final class LaneModel: ObservableObject {
     @Published var toast: ToastState?
     @Published var includeArchived = false
     @Published var panelAppeared = false
+    /// True while an explicit ⌘R refresh (hooks + reload) is running, so the UI
+    /// can show a spinner. Not set by the passive {{refresh:…}} auto-refresh.
+    @Published var isRefreshing = false
 
     /// Lanes whose `{{refresh:…}}` hook is currently re-running, so frequent
     /// re-renders don't spawn duplicate runs for the same lane.
@@ -256,33 +259,35 @@ final class LaneModel: ObservableObject {
         }
     }
 
-    /// ⌘R: reload the current level *and* re-run the lifecycle hooks
-    /// (extract-ticket → update-lane-description) so tickets and descriptions
-    /// reflect their latest state.
+    /// ⌘R: re-run the lifecycle hooks (extract-ticket → update-lane-description)
+    /// off the main thread, then fold their effects back in and reload the
+    /// current level. Shows a spinner for the duration and reloads the list in
+    /// place (no empty flash). Re-entrancy is ignored while one is in flight.
     func refresh() {
-        reloadCurrent()
-        runLaneHooks()
-    }
-
-    /// Re-run the lane hooks off the main thread, then fold their effects back
-    /// in. In the lane list this refreshes every listed lane; inside a lane it
-    /// refreshes just that lane (updating the header and reloading its items so
-    /// a freshly extracted ticket shows up).
-    private func runLaneHooks() {
-        guard let root = library.root else { return }
+        guard !isRefreshing else { return }
+        guard let root = library.root else { reloadCurrent(); return }
+        isRefreshing = true
         let hooks = LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL)
         if stack.isEmpty {
             let targets = lanes
             Task.detached {
                 for lane in targets { _ = hooks.apply(to: lane, root: root) }
-                await self.reloadLanes()
+                await MainActor.run {
+                    self.isRefreshing = false
+                    self.reloadLanes()      // diffs in place — no flicker
+                }
             }
         } else if let lane = currentLane {
             Task.detached {
                 let updated = hooks.apply(to: lane, root: root)
-                await self.applyLaneUpdate(updated)
-                await self.reloadCurrent()
+                await MainActor.run {
+                    self.isRefreshing = false
+                    self.applyLaneUpdate(updated)
+                    self.reloadCurrentInPlace()
+                }
             }
+        } else {
+            isRefreshing = false
         }
     }
 
@@ -416,6 +421,43 @@ final class LaneModel: ObservableObject {
                 showToast("\(timedOut.joined(separator: ", ")) timed out", kind: .error)
             }
             await buildIndex(levelID: levelID, token: token)
+        }
+    }
+
+    /// Reload the current level's items *without* blanking the visible list:
+    /// supersede any in-flight load, load fresh into a buffer, and swap the
+    /// items in atomically when ready. Used by ⌘R so the list never flashes
+    /// empty (unlike `loadLaneLevel`/`load(children:)`, which clear + shimmer).
+    private func reloadCurrentInPlace() {
+        guard let level = stack.last else { return }
+        let levelID = level.id
+        let token = UUID()
+        mutate(levelID) { $0.loadToken = token }   // supersede in-flight loads; keep items
+        if let source = level.sourceItem {
+            Task {
+                let kids = await source.children()
+                guard isCurrentToken(levelID, token) else { return }
+                mutate(levelID) { $0.items = kids; $0.isLoading = false }
+                await buildIndex(levelID: levelID, token: token)
+            }
+        } else if let lane = currentLane {
+            let store = LaneStore(lane: lane)
+            let providers = registry.providers
+            let services = services
+            Task {
+                var collected: [ProviderResult] = []
+                for await result in ItemLoader.load(lane: lane, store: store, services: services, providers: providers) {
+                    guard isCurrentToken(levelID, token) else { return }
+                    collected.append(result)
+                }
+                guard isCurrentToken(levelID, token) else { return }
+                mutate(levelID) {
+                    $0.providerResults = collected
+                    $0.items = LaneModel.merge(collected)
+                    $0.isLoading = false
+                }
+                await buildIndex(levelID: levelID, token: token)
+            }
         }
     }
 
