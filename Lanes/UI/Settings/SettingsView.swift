@@ -34,7 +34,7 @@ struct SettingsView: View {
             hooksTab
                 .tabItem { Label("Hooks", systemImage: "bolt.badge.clock") }
         }
-        .frame(width: 600, height: 460)
+        .frame(minWidth: 600, idealWidth: 640, minHeight: 460, idealHeight: 540)
     }
 
     private var generalTab: some View {

@@ -24,7 +24,8 @@ final class SettingsWindowController {
             let hosting = NSHostingController(rootView: SettingsView(library: library))
             let window = NSWindow(contentViewController: hosting)
             window.title = "Lanes Settings"
-            window.styleMask = [.titled, .closable]
+            window.styleMask = [.titled, .closable, .resizable]
+            window.contentMinSize = NSSize(width: 600, height: 460)
             window.isReleasedWhenClosed = false
             window.center()
             self.window = window

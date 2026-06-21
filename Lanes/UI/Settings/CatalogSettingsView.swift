@@ -2,9 +2,9 @@
 //  CatalogSettingsView.swift
 //  Lanes
 //
-//  Settings UI for catalogs: subscribe/sync/apply/remove shared config repos,
-//  and a file-backed editor that enables/orders catalog items and binds the
-//  hooks / new-lane template to catalog content (all via `.catalog` pointers).
+//  Settings UI for catalogs: subscribe/sync/apply/remove shared config repos
+//  (Catalogs tab), enable/order catalog items vs local scripts (Items tab), and
+//  bind hooks + the new-lane template to catalog content (Hooks tab).
 //
 
 import SwiftUI
@@ -138,10 +138,6 @@ struct ItemsTab: View {
 
     var body: some View {
         Form {
-            if model.catalogs.isEmpty && ConfigEdits.localItems(in: LaneFS.scriptDir(in: root)).isEmpty {
-                Text("Add a catalog on the Catalogs tab to enable shared actions here.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
             ItemScopeEditor(title: "Lane actions", subdir: "script",
                             dir: LaneFS.scriptDir(in: root), root: root, model: model)
             ItemScopeEditor(title: "Repository actions", subdir: "script/repository",
@@ -169,14 +165,14 @@ private struct ItemScopeEditor: View {
 
     var body: some View {
         Section(title) {
-            HStack(alignment: .top, spacing: 16) {
-                availablePane
-                activePane
+            HStack(alignment: .top, spacing: 14) {
+                pane("Available") { availableList }
+                pane("Active — drag to reorder") { activeList }
             }
         }
         .onAppear(perform: reload)
         .onChange(of: model.catalogs.count) { _, _ in reload() }
-        .popover(item: $editing) { entry in
+        .sheet(item: $editing) { entry in
             PointerEditor(entry: entry) { name, icon in
                 _ = try? ConfigEdits.updatePointer(entry, order: entry.order, icon: icon, name: name)
                 editing = nil
@@ -185,57 +181,59 @@ private struct ItemScopeEditor: View {
         }
     }
 
-    private var availablePane: some View {
+    private func pane<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("AVAILABLE").font(.caption2).foregroundStyle(.secondary)
-            List {
-                if available.isEmpty {
-                    Text("No catalog items").font(.caption).foregroundStyle(.secondary)
-                }
-                ForEach(available) { item in
-                    Toggle(isOn: toggleBinding(for: item)) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(item.name)
-                            Text(model.name(for: item.catalog))
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                    .help(item.detail ?? "")
-                }
-            }
-            .frame(height: 170)
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            content().frame(height: 220).frame(maxWidth: .infinity)
         }
     }
 
-    private var activePane: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("ACTIVE — drag to reorder").font(.caption2).foregroundStyle(.secondary)
-            List {
-                ForEach(active) { entry in
-                    HStack {
-                        Image(systemName: validSymbol(entry.icon)).frame(width: 16).foregroundStyle(.secondary)
-                        Text(entry.name)
-                        Spacer()
-                        Button { editing = entry } label: { Image(systemName: "pencil") }
-                            .buttonStyle(.borderless)
+    private var availableList: some View {
+        List {
+            if available.isEmpty {
+                Text("No catalog items").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(available) { item in
+                Toggle(isOn: toggleBinding(for: item)) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name)
+                        if let detail = item.detail {
+                            Text(detail).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Text(model.name(for: item.catalog)).font(.caption2).foregroundStyle(.tertiary)
                     }
                 }
-                .onMove(perform: reorder)
-                ForEach(locals) { local in
-                    HStack {
-                        Image(systemName: validSymbol(local.icon)).frame(width: 16).foregroundStyle(.secondary)
-                        Text(local.name)
-                        Text("local").font(.caption2).foregroundStyle(.tertiary)
-                        Spacer()
-                        Button("Reveal") {
-                            NSWorkspace.shared.activateFileViewerSelecting([local.url])
-                        }
-                        .buttonStyle(.borderless).font(.caption)
-                    }
+                .toggleStyle(.checkbox)
+            }
+        }
+        .listStyle(.bordered)
+    }
+
+    private var activeList: some View {
+        List {
+            ForEach(active) { entry in
+                HStack {
+                    Image(systemName: validSymbol(entry.icon)).frame(width: 16).foregroundStyle(.secondary)
+                    Text(entry.name)
+                    Text(model.name(for: entry.pointer.catalog)).font(.caption2).foregroundStyle(.tertiary)
+                    Spacer()
+                    Button { editing = entry } label: { Image(systemName: "pencil") }
+                        .buttonStyle(.borderless)
                 }
             }
-            .frame(height: 170)
+            .onMove(perform: reorder)
+            ForEach(locals) { local in
+                HStack {
+                    Image(systemName: validSymbol(local.icon)).frame(width: 16).foregroundStyle(.secondary)
+                    Text(local.name)
+                    Text("local").font(.caption2).foregroundStyle(.tertiary)
+                    Spacer()
+                    Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([local.url]) }
+                        .buttonStyle(.borderless).font(.caption)
+                }
+            }
         }
+        .listStyle(.bordered)
     }
 
     private func toggleBinding(for item: ConfigEdits.Available) -> Binding<Bool> {
@@ -272,51 +270,54 @@ private struct ItemScopeEditor: View {
 // MARK: - Hooks & template tab
 
 /// The Hooks tab: a radio chooser per hook role (and the new-lane template), each
-/// option showing its catalog source + description.
+/// option showing its catalog source + description. Selection is held in state so
+/// it reflects immediately, and written through to the `.catalog` pointer.
 struct HooksTab: View {
     let root: URL
     @ObservedObject var model: CatalogsModel
-    @State private var version = 0
+
+    @State private var ticket: String?
+    @State private var describe: String?
+    @State private var template: String?
 
     var body: some View {
         Form {
-            hookSection(
-                LaneHooks.ticketHook, title: "Extract ticket",
-                blurb: "Runs on lane creation and ⌘R. Its output is treated as a ticket key and linked to the lane.")
-            hookSection(
-                LaneHooks.descriptionHook, title: "Update lane description",
-                blurb: "Runs on lane creation and ⌘R. Its output becomes the lane's description (and may carry {{badge:…}} / {{refresh:…}}).")
+            hookSection(LaneHooks.ticketHook, title: "Extract ticket", selection: $ticket,
+                        blurb: "Runs on lane creation and ⌘R. Its output is treated as a ticket key and linked to the lane.")
+            hookSection(LaneHooks.descriptionHook, title: "Update lane description", selection: $describe,
+                        blurb: "Runs on lane creation and ⌘R. Its output becomes the lane's description (it may carry {{badge:…}} / {{refresh:…}}).")
             templateSection()
         }
         .formStyle(.grouped)
-        .onChange(of: model.catalogs.count) { _, _ in version += 1 }
+        .onAppear(perform: reloadSelections)
+        .onChange(of: model.catalogs.count) { _, _ in reloadSelections() }
     }
 
     @ViewBuilder
-    private func hookSection(_ name: String, title: String, blurb: String) -> some View {
+    private func hookSection(_ name: String, title: String,
+                             selection: Binding<String?>, blurb: String) -> some View {
+        let variants = ConfigEdits.available(root: root, subdir: "hook/\(name)")
+        let hasLocal = ConfigEdits.hasLocalHook(name, root: root)
         Section {
-            let variants = ConfigEdits.available(root: root, subdir: "hook/\(name)")
-            let current = ConfigEdits.hookPointer(name, root: root)
-            let hasLocal = ConfigEdits.hasLocalHook(name, root: root)
-            VStack(alignment: .leading, spacing: 8) {
-                Text(title).font(.headline)
-                Text(blurb).font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                header(title, blurb)
                 if variants.isEmpty && !hasLocal {
                     Text("No “\(name)” in your catalogs.").font(.caption).foregroundStyle(.secondary)
                 }
                 ForEach(variants) { item in
-                    RadioRow(selected: current?.catalog == item.catalog && current?.item == item.item,
+                    let k = key(item.catalog, item.item)
+                    RadioRow(selected: selection.wrappedValue == k,
                              title: "\(item.name)  ·  \(model.name(for: item.catalog))",
                              detail: item.detail) {
+                        selection.wrappedValue = k
                         try? ConfigEdits.setHookPointer(name, catalog: item.catalog, item: item.item, root: root)
-                        version += 1
                     }
                 }
-                RadioRow(selected: current == nil,
+                RadioRow(selected: selection.wrappedValue == nil,
                          title: hasLocal ? "Local file" : "None",
                          detail: hasLocal ? "Use the local hook script in .lanes/config/hook." : nil) {
+                    selection.wrappedValue = nil
                     try? ConfigEdits.clearHookPointer(name, root: root)
-                    version += 1
                 }
             }
         }
@@ -324,32 +325,49 @@ struct HooksTab: View {
 
     @ViewBuilder
     private func templateSection() -> some View {
+        let variants = ConfigEdits.available(root: root, subdir: "template")
         Section {
-            let variants = ConfigEdits.available(root: root, subdir: "template")
-            let current = ConfigEdits.templatePointer(root: root)
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Template").font(.headline)
-                Text("Copied into every new lane the first time it's created.")
-                    .font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                header("Template", "Copied into every new lane the first time it's created.")
                 if variants.isEmpty {
                     Text("No templates in your catalogs.").font(.caption).foregroundStyle(.secondary)
                 }
                 ForEach(variants) { item in
-                    RadioRow(selected: current?.catalog == item.catalog && current?.item == item.item,
+                    let k = key(item.catalog, item.item)
+                    RadioRow(selected: template == k,
                              title: "\(item.name)  ·  \(model.name(for: item.catalog))",
                              detail: item.detail) {
+                        template = k
                         try? ConfigEdits.setTemplatePointer(catalog: item.catalog, item: item.item, root: root)
-                        version += 1
                     }
                 }
-                RadioRow(selected: current == nil,
+                RadioRow(selected: template == nil,
                          title: "None — use the local template/ folder, if any", detail: nil) {
+                    template = nil
                     try? ConfigEdits.clearTemplatePointer(root: root)
-                    version += 1
                 }
             }
         }
     }
+
+    private func header(_ title: String, _ blurb: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.headline)
+            Text(blurb).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func reloadSelections() {
+        ticket = key(ConfigEdits.hookPointer(LaneHooks.ticketHook, root: root))
+        describe = key(ConfigEdits.hookPointer(LaneHooks.descriptionHook, root: root))
+        template = key(ConfigEdits.templatePointer(root: root))
+    }
+
+    private func key(_ pointer: Catalogs.Pointer?) -> String? {
+        pointer.map { key($0.catalog, $0.item) }
+    }
+
+    private func key(_ catalog: String, _ item: String) -> String { "\(catalog)\u{1}\(item)" }
 }
 
 private struct RadioRow: View {
@@ -382,6 +400,7 @@ private func validSymbol(_ name: String) -> String {
 private struct PointerEditor: View {
     let entry: ConfigEdits.Entry
     let onSave: (_ name: String, _ icon: String) -> Void
+    @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var icon: String
 
@@ -393,16 +412,20 @@ private struct PointerEditor: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("Edit item").font(.headline)
-            TextField("Name", text: $name).textFieldStyle(.roundedBorder).frame(width: 240)
-            TextField("SF Symbol", text: $icon, prompt: Text("scroll"))
-                .textFieldStyle(.roundedBorder)
+            Form {
+                TextField("Name", text: $name)
+                TextField("SF Symbol", text: $icon, prompt: Text("scroll"))
+            }
+            .formStyle(.grouped)
             HStack {
                 Spacer()
+                Button("Cancel") { dismiss() }
                 Button("Save") { onSave(name, icon) }.keyboardShortcut(.defaultAction)
             }
         }
-        .padding(16)
+        .padding(20)
+        .frame(width: 360)
     }
 }
