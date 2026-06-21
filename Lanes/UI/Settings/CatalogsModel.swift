@@ -48,6 +48,18 @@ nonisolated enum ConfigEdits {
         var id: String { url.path }
     }
 
+    /// An enabled, ordered item in a scope — either a catalog pointer or a local
+    /// script. Both are reorderable; local ones carry a nil `pointer`.
+    nonisolated struct ActiveItem: Identifiable, Sendable {
+        let url: URL
+        var order: Int
+        var icon: String
+        var name: String
+        let pointer: Catalogs.Pointer?
+        var isLocal: Bool { pointer == nil }
+        var id: String { url.path }
+    }
+
     private static var fm: FileManager { .default }
     private static let defaultIcon = "scroll"
 
@@ -119,36 +131,54 @@ nonisolated enum ConfigEdits {
         }
     }
 
+    /// The enabled, ordered items in `dir`: catalog pointers + local scripts
+    /// merged and sorted by order, ready to drag-reorder.
+    static func activeItems(in dir: URL) -> [ActiveItem] {
+        var out = pointers(in: dir).map {
+            ActiveItem(url: $0.url, order: $0.order, icon: $0.icon, name: $0.name, pointer: $0.pointer)
+        }
+        for local in localItems(in: dir) {
+            let parsed = parseFilename(local.url)
+            out.append(ActiveItem(url: local.url, order: parsed.order, icon: parsed.icon,
+                                  name: parsed.name, pointer: nil))
+        }
+        return out.sorted { lhs, rhs in
+            if lhs.order != rhs.order { return lhs.order < rhs.order }
+            return lhs.url.lastPathComponent.localizedStandardCompare(rhs.url.lastPathComponent) == .orderedAscending
+        }
+    }
+
     // MARK: Mutation
 
     /// Add a pointer to `item` in catalog `catalog` under `dir`, ordered after
-    /// any existing entries.
+    /// every existing active item (catalog pointers + local scripts).
     static func addPointer(in dir: URL, catalog: String, item: String,
                            name: String, icon: String) throws {
-        let order = (pointers(in: dir).map(\.order).max() ?? 0) + 10
-        let filename = makeFilename(order: order, icon: icon, name: name)
+        let order = (activeItems(in: dir).map(\.order).max() ?? 0) + 10
+        let filename = makeFilename(order: order, icon: icon, name: name, ext: Catalogs.pointerExtension)
         try writePointer(Catalogs.Pointer(catalog: catalog, item: item),
                          to: dir.appendingPathComponent(filename))
     }
 
-    /// Rewrite a pointer's display fields (order/icon/name) by renaming it,
-    /// preserving its target. Returns the new URL.
+    /// Rename an active item's file to carry `order`/`icon`/`name`, preserving
+    /// its extension — works for both catalog pointers and local scripts.
     @discardableResult
-    static func updatePointer(_ entry: Entry, order: Int, icon: String, name: String) throws -> URL {
-        let dir = entry.url.deletingLastPathComponent()
-        let dest = dir.appendingPathComponent(makeFilename(order: order, icon: icon, name: name))
-        if dest != entry.url {
+    static func renameActive(_ item: ActiveItem, order: Int, icon: String, name: String) throws -> URL {
+        let dir = item.url.deletingLastPathComponent()
+        let dest = dir.appendingPathComponent(
+            makeFilename(order: order, icon: icon, name: name, ext: item.url.pathExtension))
+        if dest != item.url {
             try? fm.removeItem(at: dest)
-            try fm.moveItem(at: entry.url, to: dest)
+            try fm.moveItem(at: item.url, to: dest)
         }
         return dest
     }
 
-    /// Persist a new order for `ordered` (e.g. after a drag/move): assign
-    /// 10, 20, 30… by renaming each pointer.
-    static func applyOrder(_ ordered: [Entry]) throws {
-        for (index, entry) in ordered.enumerated() {
-            _ = try updatePointer(entry, order: (index + 1) * 10, icon: entry.icon, name: entry.name)
+    /// Persist a new order for `ordered` (after a drag): assign 10, 20, 30… by
+    /// renaming each item — catalog pointers and local scripts alike.
+    static func applyOrder(_ ordered: [ActiveItem]) {
+        for (index, item) in ordered.enumerated() {
+            _ = try? renameActive(item, order: (index + 1) * 10, icon: item.icon, name: item.name)
         }
     }
 
@@ -214,10 +244,11 @@ nonisolated enum ConfigEdits {
         try JSONFile.writeAtomic(pointer, to: url)
     }
 
-    private static func makeFilename(order: Int, icon: String, name: String) -> String {
+    private static func makeFilename(order: Int, icon: String, name: String, ext: String) -> String {
         let safeIcon = icon.trimmingCharacters(in: .whitespaces).isEmpty ? defaultIcon : icon
         let safeName = name.replacingOccurrences(of: "/", with: "-")
-        return "\(order)---\(safeIcon)---\(safeName).\(Catalogs.pointerExtension)"
+        let base = "\(order)---\(safeIcon)---\(safeName)"
+        return ext.isEmpty ? base : "\(base).\(ext)"
     }
 
     /// `<order>---<icon>---<name>.catalog` → (order, icon, name); mirrors

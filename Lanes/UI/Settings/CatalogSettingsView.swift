@@ -130,141 +130,116 @@ private struct AddCatalogSheet: View {
 
 // MARK: - Items tab
 
-/// The Items tab: two scope sections (lane actions + repository actions), each a
-/// two-pane Available/Active editor over `.catalog` pointers and local scripts.
+/// The Items tab: one scrolling list with a section per scope (lane / repository).
+/// Each row is a catalog item (checkbox to enable/disable) or a local script; the
+/// enabled items and local scripts share one ordered, drag-reorderable group, and
+/// not-yet-enabled catalog items follow.
 struct ItemsTab: View {
     let root: URL
     @ObservedObject var model: CatalogsModel
 
-    var body: some View {
-        Form {
-            ItemScopeEditor(title: "Lane actions", subdir: "script",
-                            dir: LaneFS.scriptDir(in: root), root: root, model: model)
-            ItemScopeEditor(title: "Repository actions", subdir: "script/repository",
-                            dir: LaneFS.repoScriptDir(in: root), root: root, model: model)
-        }
-        .formStyle(.grouped)
-    }
-}
+    @State private var laneActive: [ConfigEdits.ActiveItem] = []
+    @State private var laneAvailable: [ConfigEdits.Available] = []
+    @State private var repoActive: [ConfigEdits.ActiveItem] = []
+    @State private var repoAvailable: [ConfigEdits.Available] = []
+    @State private var editing: ConfigEdits.ActiveItem?
 
-private struct ItemScopeEditor: View {
-    let title: String
-    let subdir: String
-    let dir: URL
-    let root: URL
-    @ObservedObject var model: CatalogsModel
-
-    @State private var available: [ConfigEdits.Available] = []
-    @State private var active: [ConfigEdits.Entry] = []
-    @State private var locals: [ConfigEdits.LocalItem] = []
-    @State private var editing: ConfigEdits.Entry?
-
-    private var activeKeys: Set<String> {
-        Set(active.map { key($0.pointer.catalog, $0.pointer.item) })
-    }
+    private var laneDir: URL { LaneFS.scriptDir(in: root) }
+    private var repoDir: URL { LaneFS.repoScriptDir(in: root) }
 
     var body: some View {
-        Section(title) {
-            HStack(alignment: .top, spacing: 14) {
-                pane("Available") { availableList }
-                pane("Active — drag to reorder") { activeList }
-            }
+        List {
+            scopeSection("Lane actions", dir: laneDir, active: $laneActive, available: laneAvailable)
+            scopeSection("Repository actions", dir: repoDir, active: $repoActive, available: repoAvailable)
         }
         .onAppear(perform: reload)
         .onChange(of: model.catalogs.count) { _, _ in reload() }
-        .sheet(item: $editing) { entry in
-            PointerEditor(entry: entry) { name, icon in
-                _ = try? ConfigEdits.updatePointer(entry, order: entry.order, icon: icon, name: name)
+        .sheet(item: $editing) { item in
+            PointerEditor(name: item.name, icon: item.icon) { name, icon in
+                _ = try? ConfigEdits.renameActive(item, order: item.order, icon: icon, name: name)
                 editing = nil
                 reload()
             }
         }
     }
 
-    private func pane<Content: View>(_ label: String, @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            content().frame(height: 220).frame(maxWidth: .infinity)
+    @ViewBuilder
+    private func scopeSection(_ title: String, dir: URL,
+                              active: Binding<[ConfigEdits.ActiveItem]>,
+                              available: [ConfigEdits.Available]) -> some View {
+        let inactive = available.filter { a in
+            !active.wrappedValue.contains { $0.pointer?.catalog == a.catalog && $0.pointer?.item == a.item }
+        }
+        Section(title) {
+            if active.wrappedValue.isEmpty && inactive.isEmpty {
+                Text("No catalog items or local scripts yet.").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(active.wrappedValue) { item in activeRow(item, dir: dir) }
+                .onMove { from, to in
+                    var list = active.wrappedValue
+                    list.move(fromOffsets: from, toOffset: to)
+                    ConfigEdits.applyOrder(list)
+                    reload()
+                }
+            ForEach(inactive) { item in availableRow(item, dir: dir) }
         }
     }
 
-    private var availableList: some View {
-        List {
-            if available.isEmpty {
-                Text("No catalog items").font(.caption).foregroundStyle(.secondary)
-            }
-            ForEach(available) { item in
-                Toggle(isOn: toggleBinding(for: item)) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(item.name)
-                        if let detail = item.detail {
-                            Text(detail).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Text(model.name(for: item.catalog)).font(.caption2).foregroundStyle(.tertiary)
+    private func activeRow(_ item: ConfigEdits.ActiveItem, dir: URL) -> some View {
+        HStack(spacing: 8) {
+            if item.isLocal {
+                Image(systemName: validSymbol(item.icon)).frame(width: 16).foregroundStyle(.secondary)
+                Text(item.name)
+                Text("local").font(.caption2).foregroundStyle(.tertiary)
+                Spacer()
+                Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
+                    .buttonStyle(.borderless).font(.caption)
+            } else {
+                Toggle("", isOn: Binding(get: { true }, set: { on in
+                    if !on, let p = item.pointer {
+                        ConfigEdits.removePointer(catalog: p.catalog, item: p.item, in: dir)
+                        reload()
                     }
+                }))
+                .labelsHidden().toggleStyle(.checkbox)
+                Image(systemName: validSymbol(item.icon)).frame(width: 16).foregroundStyle(.secondary)
+                Text(item.name)
+                if let p = item.pointer {
+                    Text(model.name(for: p.catalog)).font(.caption2).foregroundStyle(.tertiary)
                 }
-                .toggleStyle(.checkbox)
+                Spacer()
+                Button { editing = item } label: { Image(systemName: "pencil") }.buttonStyle(.borderless)
             }
         }
-        .listStyle(.bordered)
     }
 
-    private var activeList: some View {
-        List {
-            ForEach(active) { entry in
-                HStack {
-                    Image(systemName: validSymbol(entry.icon)).frame(width: 16).foregroundStyle(.secondary)
-                    Text(entry.name)
-                    Text(model.name(for: entry.pointer.catalog)).font(.caption2).foregroundStyle(.tertiary)
-                    Spacer()
-                    Button { editing = entry } label: { Image(systemName: "pencil") }
-                        .buttonStyle(.borderless)
-                }
-            }
-            .onMove(perform: reorder)
-            ForEach(locals) { local in
-                HStack {
-                    Image(systemName: validSymbol(local.icon)).frame(width: 16).foregroundStyle(.secondary)
-                    Text(local.name)
-                    Text("local").font(.caption2).foregroundStyle(.tertiary)
-                    Spacer()
-                    Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([local.url]) }
-                        .buttonStyle(.borderless).font(.caption)
-                }
-            }
-        }
-        .listStyle(.bordered)
-    }
-
-    private func toggleBinding(for item: ConfigEdits.Available) -> Binding<Bool> {
-        Binding(
-            get: { activeKeys.contains(key(item.catalog, item.item)) },
-            set: { on in
+    private func availableRow(_ item: ConfigEdits.Available, dir: URL) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Toggle("", isOn: Binding(get: { false }, set: { on in
                 if on {
                     try? ConfigEdits.addPointer(in: dir, catalog: item.catalog, item: item.item,
                                                 name: item.name, icon: item.icon)
-                } else {
-                    ConfigEdits.removePointer(catalog: item.catalog, item: item.item, in: dir)
+                    reload()
                 }
-                reload()
+            }))
+            .labelsHidden().toggleStyle(.checkbox)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.name)
+                if let detail = item.detail {
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+                Text(model.name(for: item.catalog)).font(.caption2).foregroundStyle(.tertiary)
             }
-        )
-    }
-
-    private func reorder(from: IndexSet, to: Int) {
-        var list = active
-        list.move(fromOffsets: from, toOffset: to)
-        try? ConfigEdits.applyOrder(list)
-        reload()
+            Spacer()
+        }
     }
 
     private func reload() {
-        available = ConfigEdits.available(root: root, subdir: subdir)
-        active = ConfigEdits.pointers(in: dir)
-        locals = ConfigEdits.localItems(in: dir)
+        laneActive = ConfigEdits.activeItems(in: laneDir)
+        laneAvailable = ConfigEdits.available(root: root, subdir: "script")
+        repoActive = ConfigEdits.activeItems(in: repoDir)
+        repoAvailable = ConfigEdits.available(root: root, subdir: "script/repository")
     }
-
-    private func key(_ catalog: String, _ item: String) -> String { "\(catalog)\u{1}\(item)" }
 }
 
 // MARK: - Hooks & template tab
@@ -314,8 +289,8 @@ struct HooksTab: View {
                     }
                 }
                 RadioRow(selected: selection.wrappedValue == nil,
-                         title: hasLocal ? "Local file" : "None",
-                         detail: hasLocal ? "Use the local hook script in .lanes/config/hook." : nil) {
+                         title: "None — use the local \(name) hook, if any",
+                         detail: nil) {
                     selection.wrappedValue = nil
                     try? ConfigEdits.clearHookPointer(name, root: root)
                 }
@@ -398,17 +373,15 @@ private func validSymbol(_ name: String) -> String {
 }
 
 private struct PointerEditor: View {
-    let entry: ConfigEdits.Entry
     let onSave: (_ name: String, _ icon: String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var icon: String
 
-    init(entry: ConfigEdits.Entry, onSave: @escaping (String, String) -> Void) {
-        self.entry = entry
+    init(name: String, icon: String, onSave: @escaping (String, String) -> Void) {
         self.onSave = onSave
-        _name = State(initialValue: entry.name)
-        _icon = State(initialValue: entry.icon)
+        _name = State(initialValue: name)
+        _icon = State(initialValue: icon)
     }
 
     var body: some View {

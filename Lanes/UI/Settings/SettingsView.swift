@@ -19,22 +19,46 @@ struct SettingsView: View {
         _catalogs = StateObject(wrappedValue: CatalogsModel(library: library))
     }
 
-    var body: some View {
-        TabView {
-            generalTab
-                .tabItem { Label("General", systemImage: "gearshape") }
-
-            Form { CatalogsSection(model: catalogs) }
-                .formStyle(.grouped)
-                .tabItem { Label("Catalogs", systemImage: "shippingbox") }
-
-            itemsTab
-                .tabItem { Label("Items", systemImage: "list.bullet") }
-
-            hooksTab
-                .tabItem { Label("Hooks", systemImage: "bolt.badge.clock") }
+    private enum Pane: String, CaseIterable, Identifiable, Hashable {
+        case general = "General", catalogs = "Catalogs", items = "Items", hooks = "Hooks"
+        var id: Self { self }
+        var symbol: String {
+            switch self {
+            case .general: return "gearshape"
+            case .catalogs: return "shippingbox"
+            case .items: return "list.bullet"
+            case .hooks: return "bolt.badge.clock"
+            }
         }
-        .frame(minWidth: 600, idealWidth: 640, minHeight: 460, idealHeight: 540)
+    }
+
+    @State private var pane: Pane? = .general
+
+    var body: some View {
+        NavigationSplitView {
+            List(Pane.allCases, selection: $pane) { pane in
+                Label(pane.rawValue, systemImage: pane.symbol).tag(pane)
+            }
+            .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 210)
+        } detail: {
+            detail(pane ?? .general)
+                .navigationTitle((pane ?? .general).rawValue)
+        }
+        .frame(minWidth: 720, idealWidth: 760, minHeight: 480, idealHeight: 560)
+    }
+
+    @ViewBuilder
+    private func detail(_ pane: Pane) -> some View {
+        switch pane {
+        case .general:
+            generalTab
+        case .catalogs:
+            Form { CatalogsSection(model: catalogs) }.formStyle(.grouped)
+        case .items:
+            itemsTab
+        case .hooks:
+            hooksTab
+        }
     }
 
     private var generalTab: some View {
@@ -98,7 +122,7 @@ struct SettingsView: View {
     }
 
     private var noRootNotice: some View {
-        Text("Choose a root folder on the General tab first.")
+        Text("Choose a root folder on the General pane first.")
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
