@@ -97,13 +97,20 @@ the launcher.
 
 Scripts inherit your environment (so `PATH` etc. are intact) plus:
 
-| Variable     | In lane scripts | In `repository/` scripts |
-| ------------ | --------------- | ------------------------ |
-| `LANE_DIR`   | ✅ lane folder path | ✅ |
-| `LANE_NAME`  | ✅ folder name      | ✅ |
-| `LANE_ID`    | ✅ lane UUID        | ✅ |
-| `REPO_DIR`   | —               | ✅ repository folder path |
-| `REPO_NAME`  | —               | ✅ repository folder name  |
+| Variable      | In lane scripts | In `repository/` scripts |
+| ------------- | --------------- | ------------------------ |
+| `LANE_DIR`    | ✅ lane folder path | ✅ |
+| `LANE_NAME`   | ✅ folder name      | ✅ |
+| `LANE_ID`     | ✅ lane UUID        | ✅ |
+| `TICKET_KEY`  | ✅ primary linked ticket key (e.g. `PROJ-123`) | ✅ |
+| `TICKET_URL`  | ✅ that ticket's URL | ✅ |
+| `REPO_DIR`    | —               | ✅ repository folder path |
+| `REPO_NAME`   | —               | ✅ repository folder name  |
+
+`TICKET_KEY`/`TICKET_URL` describe the lane's **first** linked ticket and are
+**unset** when the lane has none (guard with `${TICKET_KEY:-}`). `TICKET_URL` is
+empty if the ticket has no explicit URL and no base URL is configured in
+Settings.
 
 ### Example
 
@@ -113,7 +120,7 @@ ticket** with the `link` icon):
 ```sh
 #!/usr/bin/env bash
 set -euo pipefail
-open "https://tickets.example.com/browse/$(basename "$LANE_DIR")"
+open "${TICKET_URL:?No ticket linked to this lane}"
 ```
 
 `.lanes/config/script-items/repository/10---fetch---arrow.triangle.2.circlepath.sh`

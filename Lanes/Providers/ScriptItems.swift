@@ -68,8 +68,8 @@ nonisolated struct ScriptItems: Sendable {
     // MARK: - Items
 
     /// Lane-level actions from `<root>/.lanes/config/script-items`.
-    func laneItems(root: URL, lane: Lane) -> [any Item] {
-        let env = Self.laneEnv(for: lane)
+    func laneItems(root: URL, lane: Lane, ticket: TicketEnv?) -> [any Item] {
+        let env = Self.laneEnv(for: lane, ticket: ticket)
         return Self.executableFiles(in: LaneFS.scriptItemsDir(in: root)).map { url in
             item(id: "script:\(url.path)", scriptURL: url, cwd: lane.url, env: env)
         }
@@ -78,8 +78,8 @@ nonisolated struct ScriptItems: Sendable {
     /// Per-repository actions, run in `repoURL`. `scripts` is the already-read
     /// listing of `<root>/.lanes/config/script-items/repository` (read once and
     /// reused across repos).
-    func repoItems(scripts: [URL], repoURL: URL, lane: Lane) -> [any Item] {
-        var env = Self.laneEnv(for: lane)
+    func repoItems(scripts: [URL], repoURL: URL, lane: Lane, ticket: TicketEnv?) -> [any Item] {
+        var env = Self.laneEnv(for: lane, ticket: ticket)
         env["REPO_DIR"] = repoURL.path
         env["REPO_NAME"] = repoURL.lastPathComponent
         return scripts.map { url in
@@ -89,8 +89,13 @@ nonisolated struct ScriptItems: Sendable {
 
     // MARK: - Internals
 
-    private static func laneEnv(for lane: Lane) -> [String: String] {
-        ["LANE_DIR": lane.url.path, "LANE_NAME": lane.name, "LANE_ID": lane.id.uuidString]
+    private static func laneEnv(for lane: Lane, ticket: TicketEnv?) -> [String: String] {
+        var env = ["LANE_DIR": lane.url.path, "LANE_NAME": lane.name, "LANE_ID": lane.id.uuidString]
+        if let ticket {
+            env["TICKET_KEY"] = ticket.key
+            env["TICKET_URL"] = ticket.url
+        }
+        return env
     }
 
     private func item(id: String, scriptURL: URL, cwd: URL, env: [String: String]) -> any Item {

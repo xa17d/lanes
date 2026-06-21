@@ -14,11 +14,26 @@ nonisolated struct TicketLink: Codable, Sendable {
     let urlOverride: URL?
 }
 
+/// A lane's ticket resolved for script consumption (`TICKET_KEY`/`TICKET_URL`).
+nonisolated struct TicketEnv: Sendable {
+    let key: String
+    let url: String   // empty when there's no override and no base URL
+}
+
 nonisolated struct TicketProvider: LaneProvider {
     let section = 0
     var displayName: String { "Tickets" }
 
     private static let storeKey = "ticket"
+
+    /// The lane's primary (first) linked ticket, resolved for script env vars,
+    /// or nil when no ticket is linked. The URL mirrors the item's own logic:
+    /// an explicit override, else the configured base URL joined with the key.
+    static func primaryEnv(store: LaneStore, baseURL: @Sendable () -> URL?) -> TicketEnv? {
+        guard let link = (store.value([TicketLink].self, storeKey) ?? []).first else { return nil }
+        let url = link.urlOverride ?? baseURL()?.appendingPathComponent(link.key)
+        return TicketEnv(key: link.key, url: url?.absoluteString ?? "")
+    }
 
     func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
         let links = store.value([TicketLink].self, Self.storeKey) ?? []

@@ -26,6 +26,7 @@ nonisolated struct RepositoryProvider: LaneProvider {
         let repoScripts = ScriptItems.executableFiles(
             in: LaneFS.repoScriptItemsDir(in: LaneActions.root(of: lane)))
         let lane = lane
+        let ticket = TicketProvider.primaryEnv(store: store, baseURL: services.ticketBaseURL)
 
         // Read branches per-repo concurrently.
         return await withTaskGroup(of: (Int, any Item).self) { group in
@@ -42,7 +43,8 @@ nonisolated struct RepositoryProvider: LaneProvider {
                             Self.actions(repoURL: repoURL, laneID: laneID,
                                          git: git, hosts: hosts, chrome: chrome,
                                          iterm: iterm,
-                                         scripts: scripts, repoScripts: repoScripts, lane: lane)
+                                         scripts: scripts, repoScripts: repoScripts,
+                                         lane: lane, ticket: ticket)
                         }
                     )
                     return (index, item)
@@ -58,7 +60,7 @@ nonisolated struct RepositoryProvider: LaneProvider {
         repoURL: URL, laneID: UUID,
         git: GitInspector, hosts: HostResolver, chrome: ChromeController,
         iterm: ITermController,
-        scripts: ScriptItems, repoScripts: [URL], lane: Lane
+        scripts: ScriptItems, repoScripts: [URL], lane: Lane, ticket: TicketEnv?
     ) -> [any Item] {
         let path = repoURL.path
         var actions: [any Item] = []
@@ -83,7 +85,7 @@ nonisolated struct RepositoryProvider: LaneProvider {
 
         // Custom per-repo scripts (incl. the editor/Finder launcher examples),
         // run with this repo as cwd.
-        actions += scripts.repoItems(scripts: repoScripts, repoURL: repoURL, lane: lane)
+        actions += scripts.repoItems(scripts: repoScripts, repoURL: repoURL, lane: lane, ticket: ticket)
         return actions
     }
 }
