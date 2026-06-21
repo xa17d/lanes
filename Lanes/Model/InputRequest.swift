@@ -2,7 +2,7 @@
 //  InputRequest.swift
 //  Lanes
 //
-//  Describes a single-field input level (Link Jira ticket…, New lane…,
+//  Describes a single-field input level (Link ticket…, New lane…,
 //  Rename…). The submit handler performs the side effect and returns the
 //  navigation outcome.
 //

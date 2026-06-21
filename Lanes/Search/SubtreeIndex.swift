@@ -48,7 +48,7 @@ nonisolated enum SubtreeIndex {
             return (entry, s)
         }
         // Primary (content) matches first, then secondary "meta" actions like
-        // "Link Jira ticket…"; within each group, best score first.
+        // "Link ticket…"; within each group, best score first.
         return scored.sorted { a, b in
             if a.0.item.isSecondary != b.0.item.isSecondary { return !a.0.item.isSecondary }
             return a.1 > b.1

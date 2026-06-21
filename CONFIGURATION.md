@@ -107,13 +107,13 @@ Scripts inherit your environment (so `PATH` etc. are intact) plus:
 
 ### Example
 
-`.lanes/config/script-items/10---open jira---link.sh` (shows as **open jira**
-with the `link` icon):
+`.lanes/config/script-items/10---open ticket---link.sh` (shows as **open
+ticket** with the `link` icon):
 
 ```sh
 #!/usr/bin/env bash
 set -euo pipefail
-open "https://jira.example.com/browse/$(basename "$LANE_DIR")"
+open "https://tickets.example.com/browse/$(basename "$LANE_DIR")"
 ```
 
 `.lanes/config/script-items/repository/10---fetch---arrow.triangle.2.circlepath.sh`
@@ -126,7 +126,7 @@ git -C "$REPO_DIR" fetch --all --prune
 ```
 
 ```sh
-chmod +x ".lanes/config/script-items/10---open jira---link.sh"
+chmod +x ".lanes/config/script-items/10---open ticket---link.sh"
 chmod +x ".lanes/config/script-items/repository/10---fetch---arrow.triangle.2.circlepath.sh"
 ```
 

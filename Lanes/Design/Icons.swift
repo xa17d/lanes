@@ -10,7 +10,7 @@ import Foundation
 
 nonisolated enum IconToken: Sendable, Hashable {
     case folder          // lane folder / finder
-    case jira
+    case ticket
     case repo
     case pullRequest
     case ci
@@ -37,7 +37,7 @@ nonisolated enum IconToken: Sendable, Hashable {
     var symbol: String {
         switch self {
         case .folder:       return "folder"
-        case .jira:         return "tag"
+        case .ticket:       return "tag"
         case .repo:         return "chevron.left.forwardslash.chevron.right"
         case .pullRequest:  return "arrow.triangle.pull"
         case .ci:           return "checkmark.seal"

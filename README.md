@@ -1,7 +1,7 @@
 # Lanes
 
 A keyboard-first macOS launcher for switching between parallel work **lanes**.
-Each lane is a folder; inside it live repos and linked Jira tickets, and every
+Each lane is a folder; inside it live repos and linked tickets, and every
 item exposes actions that **focus an existing window or launch a new one**.
 
 ## What it does
@@ -17,7 +17,9 @@ item exposes actions that **focus an existing window or launch a new one**.
   `<root>/.lanes/config/hooks/update-lane-description` exists, its output is used
   as a lane's description on creation and on ⌘R.
 - **Inside a lane**, providers contribute actions:
-  - **Jira** — focus an open ticket tab or open it in Chrome; link new tickets.
+  - **Tickets** — focus an open ticket tab or open it in Chrome; link new
+    tickets (by key like `PROJ-123` or by pasting a URL). A base URL set in
+    Settings turns keys into links.
   - **Repositories** — per repo: Open PR (host-aware) and Open Terminal here
     (tagged iTerm session). The editor/Finder/CI launchers (Fork, Android
     Studio, VS Code, Finder, GitHub Actions) ship as ready-to-use example

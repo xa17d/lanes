@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  Lanes
 //
-//  Root folder, Jira base URL, hotkey recorder, and the Automation deep-link.
+//  Root folder, ticket base URL, hotkey recorder, and the Automation deep-link.
 //
 
 import SwiftUI
@@ -11,7 +11,7 @@ import KeyboardShortcuts
 
 struct SettingsView: View {
     @ObservedObject var library: LaneLibrary
-    @AppStorage(SettingsKeys.jiraBaseURL) private var jiraBaseURL = ""
+    @AppStorage(SettingsKeys.ticketBaseURL) private var ticketBaseURL = ""
 
     var body: some View {
         Form {
@@ -30,8 +30,8 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Jira") {
-                TextField("Base URL", text: $jiraBaseURL,
+            Section("Tickets") {
+                TextField("Base URL", text: $ticketBaseURL,
                           prompt: Text("https://yourco.atlassian.net/browse/"))
                     .textFieldStyle(.roundedBorder)
                 Text("Used to build ticket URLs from keys.")

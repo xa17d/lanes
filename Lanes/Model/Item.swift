@@ -24,7 +24,7 @@ protocol Item: Identifiable, Sendable {
     nonisolated var subtitle: String? { get }
     nonisolated var icon: IconToken { get }
     nonisolated var keywords: [String] { get }
-    /// "Meta" actions (e.g. "Link Jira ticket…", "Manage lane…") that should
+    /// "Meta" actions (e.g. "Link ticket…", "Manage lane…") that should
     /// rank *below* genuine content matches when searching, even if their
     /// title scores higher for the query.
     nonisolated var isSecondary: Bool { get }

@@ -126,6 +126,6 @@ struct LevelView: View {
             }
             return "No lanes yet. Press ⌘N to create one."
         }
-        return "Nothing here yet.\nLink a Jira ticket or drop a repo into this folder."
+        return "Nothing here yet.\nLink a ticket or drop a repo into this folder."
     }
 }

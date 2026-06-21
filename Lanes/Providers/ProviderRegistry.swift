@@ -17,7 +17,7 @@ nonisolated struct ProviderRegistry: Sendable {
 
     /// The shipping set of providers, ordered by section.
     static let `default` = ProviderRegistry(providers: [
-        JiraProvider(),
+        TicketProvider(),
         RepositoryProvider(),
         FolderProvider(),
         AgentsProvider(),

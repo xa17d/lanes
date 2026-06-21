@@ -20,12 +20,14 @@ final class AppCore {
     private init() {}
 
     private static func makeServices() -> Services {
-        Services(jiraBaseURL: {
-            UserDefaults.standard.string(forKey: SettingsKeys.jiraBaseURL).flatMap { URL(string: $0) }
+        Services(ticketBaseURL: {
+            UserDefaults.standard.string(forKey: SettingsKeys.ticketBaseURL).flatMap { URL(string: $0) }
         })
     }
 }
 
 nonisolated enum SettingsKeys {
-    static let jiraBaseURL = "jiraBaseURL"
+    /// Legacy "jiraBaseURL" string is kept so an already-configured base URL
+    /// survives the rename to generic "ticket" vocabulary.
+    static let ticketBaseURL = "jiraBaseURL"
 }

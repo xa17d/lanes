@@ -15,12 +15,12 @@ nonisolated struct Services: Sendable {
     var chrome: ChromeController
     var iterm: ITermController
     var apps: AppLauncher
-    var jiraBaseURL: @Sendable () -> URL?
+    var ticketBaseURL: @Sendable () -> URL?
 
     init(
         shell: Shell = Shell(),
         hosts: HostResolver = HostResolver(),
-        jiraBaseURL: @escaping @Sendable () -> URL? = { nil }
+        ticketBaseURL: @escaping @Sendable () -> URL? = { nil }
     ) {
         self.shell = shell
         self.git = GitInspector(shell: shell)
@@ -28,6 +28,6 @@ nonisolated struct Services: Sendable {
         self.chrome = ChromeController(shell: shell)
         self.iterm = ITermController(shell: shell)
         self.apps = AppLauncher(shell: shell)
-        self.jiraBaseURL = jiraBaseURL
+        self.ticketBaseURL = ticketBaseURL
     }
 }
