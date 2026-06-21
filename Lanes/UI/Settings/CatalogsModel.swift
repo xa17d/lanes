@@ -39,6 +39,15 @@ nonisolated enum ConfigEdits {
         var id: String { url.path }
     }
 
+    /// A hand-made local script (not a catalog pointer) in a config dir — shown
+    /// read-only in the editor with only "Reveal in Finder".
+    nonisolated struct LocalItem: Identifiable, Sendable {
+        let url: URL
+        let name: String
+        let icon: String
+        var id: String { url.path }
+    }
+
     private static var fm: FileManager { .default }
     private static let defaultIcon = "scroll"
 
@@ -72,6 +81,24 @@ nonisolated enum ConfigEdits {
             }
         }
         .sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
+    }
+
+    /// Hand-made local executables (not `.catalog` pointers) in `dir`, sorted by
+    /// name — shown read-only in the editor.
+    static func localItems(in dir: URL) -> [LocalItem] {
+        guard let entries = try? fm.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]
+        ) else { return [] }
+        let items: [LocalItem] = entries.compactMap { url -> LocalItem? in
+            let leaf = url.lastPathComponent
+            if leaf.hasPrefix(".") || leaf.lowercased().hasPrefix("readme") { return nil }
+            if Catalogs.isPointer(url) { return nil }
+            let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+            guard isRegular, fm.isExecutableFile(atPath: url.path) else { return nil }
+            let parsed = parseFilename(url)
+            return LocalItem(url: url, name: parsed.name, icon: parsed.icon)
+        }
+        return items.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
     /// The `.catalog` pointer entries enabled in `dir`, in display order.
@@ -129,11 +156,27 @@ nonisolated enum ConfigEdits {
         try fm.removeItem(at: url)
     }
 
+    /// Remove the pointer(s) in `dir` that reference catalog `catalog`'s `item`
+    /// (used to deactivate a catalog item via its checkbox).
+    static func removePointer(catalog: String, item: String, in dir: URL) {
+        for entry in pointers(in: dir)
+        where entry.pointer.catalog == catalog && entry.pointer.item == item {
+            try? fm.removeItem(at: entry.url)
+        }
+    }
+
     // MARK: Hooks & template bindings
 
     /// The pointer bound to hook `name`, if any.
     static func hookPointer(_ name: String, root: URL) -> Catalogs.Pointer? {
         JSONFile.read(Catalogs.Pointer.self, at: hookPointerURL(name, root: root))
+    }
+
+    /// Whether a local (non-pointer) executable hook named `name` exists.
+    static func hasLocalHook(_ name: String, root: URL) -> Bool {
+        let url = LaneFS.hookDir(in: root).appendingPathComponent(name)
+        let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+        return isRegular && fm.isExecutableFile(atPath: url.path)
     }
 
     static func setHookPointer(_ name: String, catalog: String, item: String, root: URL) throws {

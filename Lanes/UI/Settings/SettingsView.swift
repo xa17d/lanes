@@ -20,6 +20,24 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        TabView {
+            generalTab
+                .tabItem { Label("General", systemImage: "gearshape") }
+
+            Form { CatalogsSection(model: catalogs) }
+                .formStyle(.grouped)
+                .tabItem { Label("Catalogs", systemImage: "shippingbox") }
+
+            itemsTab
+                .tabItem { Label("Items", systemImage: "list.bullet") }
+
+            hooksTab
+                .tabItem { Label("Hooks", systemImage: "bolt.badge.clock") }
+        }
+        .frame(width: 600, height: 460)
+    }
+
+    private var generalTab: some View {
         Form {
             Section("Root folder") {
                 HStack {
@@ -45,12 +63,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            CatalogsSection(model: catalogs)
-
-            if let root = library.root {
-                ConfigEditorSection(root: root, model: catalogs)
-            }
-
             Section("Hotkey") {
                 KeyboardShortcuts.Recorder("Toggle Lanes", name: .toggleLane)
             }
@@ -65,8 +77,30 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var itemsTab: some View {
+        if let root = library.root {
+            ItemsTab(root: root, model: catalogs)
+        } else {
+            noRootNotice
+        }
+    }
+
+    @ViewBuilder
+    private var hooksTab: some View {
+        if let root = library.root {
+            HooksTab(root: root, model: catalogs)
+        } else {
+            noRootNotice
+        }
+    }
+
+    private var noRootNotice: some View {
+        Text("Choose a root folder on the General tab first.")
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func chooseRoot() {
