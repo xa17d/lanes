@@ -49,22 +49,53 @@ nonisolated enum LaneFS {
         configDir(in: root).appendingPathComponent("template", isDirectory: true)
     }
 
-    /// `<root>/.lanes/config/script-items` — each executable file is a custom
-    /// lane-level action (run with the lane dir as cwd).
-    static func scriptItemsDir(in root: URL) -> URL {
-        configDir(in: root).appendingPathComponent("script-items", isDirectory: true)
+    /// `<root>/.lanes/config/template.catalog` — optional pointer to a template
+    /// directory inside a catalog. When present it takes precedence over the
+    /// local `template/` dir.
+    static func templatePointer(in root: URL) -> URL {
+        configDir(in: root).appendingPathComponent("template.catalog")
     }
 
-    /// `<root>/.lanes/config/script-items/repository` — each executable file is
-    /// a custom per-repository action (run with the repo dir as cwd).
-    static func repoScriptItemsDir(in root: URL) -> URL {
-        scriptItemsDir(in: root).appendingPathComponent("repository", isDirectory: true)
+    /// `<root>/.lanes/config/script` — each executable file (or `.catalog`
+    /// pointer) is a custom lane-level action (run with the lane dir as cwd).
+    static func scriptDir(in root: URL) -> URL {
+        configDir(in: root).appendingPathComponent("script", isDirectory: true)
     }
 
-    /// `<root>/.lanes/config/hooks` — lifecycle hook scripts (e.g.
-    /// `update-lane-description`).
-    static func hooksDir(in root: URL) -> URL {
-        configDir(in: root).appendingPathComponent("hooks", isDirectory: true)
+    /// `<root>/.lanes/config/script/repository` — each executable file (or
+    /// `.catalog` pointer) is a custom per-repository action (run with the repo
+    /// dir as cwd).
+    static func repoScriptDir(in root: URL) -> URL {
+        scriptDir(in: root).appendingPathComponent("repository", isDirectory: true)
+    }
+
+    /// `<root>/.lanes/config/hook` — lifecycle hook scripts (e.g.
+    /// `update-lane-description`), optionally backed by a `<name>.catalog` pointer.
+    static func hookDir(in root: URL) -> URL {
+        configDir(in: root).appendingPathComponent("hook", isDirectory: true)
+    }
+
+    // MARK: - Catalogs
+
+    /// `<root>/.lanes/catalog` — subscribed catalogs (shared config git repos).
+    static func catalogDir(in root: URL) -> URL {
+        lanesDir(in: root).appendingPathComponent("catalog", isDirectory: true)
+    }
+
+    /// `<root>/.lanes/catalog/<id>` — one subscribed catalog.
+    static func catalogDir(id: String, in root: URL) -> URL {
+        catalogDir(in: root).appendingPathComponent(id, isDirectory: true)
+    }
+
+    /// `<root>/.lanes/catalog/<id>/catalog.json` — the catalog descriptor.
+    static func catalogConfigURL(id: String, in root: URL) -> URL {
+        catalogDir(id: id, in: root).appendingPathComponent("catalog.json")
+    }
+
+    /// `<root>/.lanes/catalog/<id>/checkout` — the catalog's git clone (a
+    /// rebuildable cache; the descriptor is the source of truth).
+    static func catalogCheckout(id: String, in root: URL) -> URL {
+        catalogDir(id: id, in: root).appendingPathComponent("checkout", isDirectory: true)
     }
 
     // MARK: - Meta
@@ -191,12 +222,15 @@ nonisolated enum LaneFS {
 
     // MARK: - Helpers
 
-    /// Copy the contents of `<root>/.lanes/config/template` into a freshly
-    /// minted lane. The root is the lane's parent (active lanes sit directly
-    /// under the root). No-op when there is no template. Existing entries in the
+    /// Copy the contents of the effective template dir into a freshly minted
+    /// lane. The root is the lane's parent (active lanes sit directly under the
+    /// root). A `template.catalog` pointer takes precedence over the local
+    /// `template/` dir. No-op when there is no template. Existing entries in the
     /// lane (e.g. the `.lane` meta we just wrote) are never clobbered.
     private static func applyTemplateIfPresent(to laneURL: URL) {
-        let template = templateDir(in: laneURL.deletingLastPathComponent())
+        let root = laneURL.deletingLastPathComponent()
+        let pointer = templatePointer(in: root)
+        let template = Catalogs.resolvePointer(at: pointer, root: root) ?? templateDir(in: root)
         guard let entries = try? fm.contentsOfDirectory(
             at: template, includingPropertiesForKeys: nil, options: []
         ) else { return }

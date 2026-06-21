@@ -11,7 +11,13 @@ import KeyboardShortcuts
 
 struct SettingsView: View {
     @ObservedObject var library: LaneLibrary
+    @StateObject private var catalogs: CatalogsModel
     @AppStorage(SettingsKeys.ticketBaseURL) private var ticketBaseURL = ""
+
+    init(library: LaneLibrary) {
+        _library = ObservedObject(wrappedValue: library)
+        _catalogs = StateObject(wrappedValue: CatalogsModel(library: library))
+    }
 
     var body: some View {
         Form {
@@ -37,6 +43,12 @@ struct SettingsView: View {
                 Text("Used to build ticket URLs from keys.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            CatalogsSection(model: catalogs)
+
+            if let root = library.root {
+                ConfigEditorSection(root: root, model: catalogs)
             }
 
             Section("Hotkey") {

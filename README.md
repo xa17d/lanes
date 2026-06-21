@@ -10,21 +10,22 @@ Each lane is a folder; inside it live repos and linked tickets, and every item e
   `↵` opens a lane, `→` reveals its management menu (Rename / Archive / Delete…), `⌘N` creates one, `⌘⇧A` toggles archived lanes, `⌘R` refreshes descriptions.
   Search matches both the name and the description.
   A description can embed directives: `{{badge:color:text}}` for a colored status badge and `{{refresh:30m}}` to auto-refresh on a schedule.
-  If `<root>/.lanes/config/hooks/update-lane-description` exists, its output is used as a lane's description on creation, on ⌘R, and on its `{{refresh:…}}` interval.
+  If `<root>/.lanes/config/hook/update-lane-description` exists, its output is used as a lane's description on creation, on ⌘R, and on its `{{refresh:…}}` interval.
 - **Inside a lane**, providers contribute actions:
   - **Tickets** — focus an open ticket tab or open it in Chrome; link new tickets (by key like `PROJ-123` or by pasting a URL).
     A base URL set in Settings turns keys into links.
-  - **Repositories** — one entry per discovered repo (subtitle = current branch); its actions are the per-repo script-items.
-    Open PR (host-aware), Open Terminal here, and the editor/Finder/CI launchers (Fork, Android Studio, VS Code, Finder, GitHub Actions) all ship as ready-to-use example script-items in [`examples/`](examples/) rather than built-ins.
-  - **Agents & terminal** — Open Terminal here, Claude, and opencode (each a tagged iTerm session at the lane root) ship as example lane-level script-items in [`examples/`](examples/).
-  - **Scripts** — drop an executable file in `<root>/.lanes/config/script-items/` to add a custom lane action (run with the lane dir as cwd); files under `script-items/repository/` become per-repo actions (run in the repo dir).
+  - **Repositories** — one entry per discovered repo (subtitle = current branch); its actions are the per-repo scripts.
+    Open PR (host-aware), Open Terminal here, and the editor/Finder/CI launchers (Fork, Android Studio, VS Code, Finder, GitHub Actions) all ship as ready-to-use example scripts in [`examples/`](examples/) rather than built-ins.
+  - **Agents & terminal** — Open Terminal here, Claude, and opencode (each a tagged iTerm session at the lane root) ship as example lane-level scripts in [`examples/`](examples/).
+  - **Scripts** — drop an executable file in `<root>/.lanes/config/script/` to add a custom lane action (run with the lane dir as cwd); files under `script/repository/` become per-repo actions (run in the repo dir).
     Scripts run silently with `LANE_DIR`/`LANE_NAME`/`LANE_ID`, `TICKET_KEY`/`TICKET_URL` for the lane's primary linked ticket (and `REPO_DIR`/`REPO_NAME` for repo scripts) in the environment; stderr from a failing script is shown as a toast.
     See [`examples/`](examples/) for drop-in scripts.
 - **Search** is fuzzy and subtree-wide: typing filters the current level, and a non-empty query surfaces nested actions with their breadcrumb (`service-api › Open PR`).
 
 ## Configuration
 
-Templates, custom actions (script-items), lane descriptions / status badges, and lifecycle hooks are all configured by dropping files under `<root>/.lanes/`.
+Templates, custom actions (scripts), lane descriptions / status badges, and lifecycle hooks are all configured by dropping files under `<root>/.lanes/`.
+Teams can share and update those actions/hooks/templates by subscribing to **catalogs** (git repos of shared config) in Settings.
 See **[CONFIGURATION.md](CONFIGURATION.md)** for the full reference.
 
 ## Architecture

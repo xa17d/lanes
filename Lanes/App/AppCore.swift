@@ -28,4 +28,7 @@ final class AppCore {
 
 nonisolated enum SettingsKeys {
     static let ticketBaseURL = "ticketBaseURL"
+    /// Set once the user acknowledges the one-time warning that catalogs run
+    /// shared code on their machine (shown before the first catalog is added).
+    static let catalogTrustAcknowledged = "catalogTrustAcknowledged"
 }

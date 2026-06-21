@@ -101,19 +101,33 @@ nonisolated struct LaneHooks: Sendable {
         ["LANE_DIR": lane.url.path, "LANE_NAME": lane.name, "LANE_ID": lane.id.uuidString]
     }
 
-    /// Whether hook `name` exists as an executable regular file.
-    private func hookExists(_ name: String, root: URL) -> Bool {
-        let url = LaneFS.hooksDir(in: root).appendingPathComponent(name)
+    /// The effective executable for hook `name`: a `<name>.catalog` pointer wins
+    /// over a local `<name>` file (delete the pointer to fall back to local), and
+    /// the resolved target must itself be an executable regular file. nil when
+    /// neither is present/runnable.
+    private func hookURL(_ name: String, root: URL) -> URL? {
+        let dir = LaneFS.hookDir(in: root)
         let fm = FileManager.default
-        let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-        return isRegular && fm.isExecutableFile(atPath: url.path)
+        let pointer = dir.appendingPathComponent("\(name).\(Catalogs.pointerExtension)")
+        if fm.fileExists(atPath: pointer.path),
+           let target = Catalogs.resolvePointer(at: pointer, root: root),
+           fm.isExecutableFile(atPath: target.path) {
+            return target
+        }
+        let local = dir.appendingPathComponent(name)
+        let isRegular = (try? local.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+        return (isRegular && fm.isExecutableFile(atPath: local.path)) ? local : nil
+    }
+
+    /// Whether hook `name` resolves to a runnable executable.
+    private func hookExists(_ name: String, root: URL) -> Bool {
+        hookURL(name, root: root) != nil
     }
 
     /// Run hook `name` (cwd = the lane dir) and return its trimmed stdout, or
     /// nil when the hook is absent/not executable, fails, or prints nothing.
     private func stdout(of name: String, for lane: Lane, root: URL, env: [String: String]) -> String? {
-        guard hookExists(name, root: root) else { return nil }
-        let url = LaneFS.hooksDir(in: root).appendingPathComponent(name)
+        guard let url = hookURL(name, root: root) else { return nil }
         guard let out = try? shell.run(url.path, [], cwd: lane.url, env: env) else { return nil }
         let trimmed = out.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed

@@ -16,13 +16,14 @@ nonisolated struct RepositoryProvider: LaneProvider {
         let repos = services.git.discoverRepos(in: lane.url)
         let git = services.git
 
-        // Custom per-repo scripts from <root>/.lanes/config/script-items/repository
+        // Custom per-repo scripts from <root>/.lanes/config/script/repository
         // (read once, reused for every repo). The Open PR / Open Terminal here /
         // editor / Finder / CI actions all ship as drop-in examples there — see
-        // examples/script-items/repository.
+        // examples/script/repository.
         let scripts = ScriptItems(shell: services.shell)
-        let repoScripts = ScriptItems.executableFiles(
-            in: LaneFS.repoScriptItemsDir(in: LaneActions.root(of: lane)))
+        let root = LaneActions.root(of: lane)
+        let repoScripts = ScriptItems.effectiveScripts(
+            in: LaneFS.repoScriptDir(in: root), root: root)
         let lane = lane
         let ticket = TicketProvider.primaryEnv(store: store, baseURL: services.ticketBaseURL)
 

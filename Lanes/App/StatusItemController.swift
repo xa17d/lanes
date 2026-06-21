@@ -13,6 +13,7 @@ final class StatusItemController: NSObject {
     private let onToggle: () -> Void
     private let onSettings: () -> Void
     private let onQuit: () -> Void
+    private var updateBadge: NSView?
 
     init(onToggle: @escaping () -> Void,
          onSettings: @escaping () -> Void,
@@ -39,6 +40,28 @@ final class StatusItemController: NSObject {
         menu.addItem(.separator())
         menu.addItem(menuItem("Quit Lanes", #selector(quit), key: "q"))
         statusItem.menu = menu
+    }
+
+    /// Show or hide a small orange dot over the menu-bar icon to signal that a
+    /// catalog has fetched updates waiting to be applied.
+    func setUpdatesAvailable(_ available: Bool) {
+        guard let button = statusItem.button else { return }
+        if available {
+            let dot = updateBadge ?? {
+                let view = NSView()
+                view.wantsLayer = true
+                view.layer?.backgroundColor = NSColor.systemOrange.cgColor
+                view.layer?.cornerRadius = 3
+                button.addSubview(view)
+                updateBadge = view
+                return view
+            }()
+            let bounds = button.bounds
+            dot.frame = NSRect(x: bounds.maxX - 7, y: bounds.maxY - 7, width: 6, height: 6)
+        } else {
+            updateBadge?.removeFromSuperview()
+            updateBadge = nil
+        }
     }
 
     private func menuItem(_ title: String, _ action: Selector, key: String) -> NSMenuItem {

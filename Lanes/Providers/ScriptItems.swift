@@ -10,6 +10,15 @@
 
 import Foundation
 
+/// One resolved custom action: `display` is the local filename (it drives the
+/// order/title/icon and the item id), `exec` is the executable actually run —
+/// the same file for a plain script, or a catalog target for a `.catalog`
+/// pointer.
+nonisolated struct EffectiveScript: Sendable {
+    let display: URL
+    let exec: URL
+}
+
 nonisolated struct ScriptItems: Sendable {
     let shell: Shell
 
@@ -35,15 +44,49 @@ nonisolated struct ScriptItems: Sendable {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 
-    /// Filename → display title: strip a `[sf.symbol]` icon token, drop the
-    /// Filenames follow a fixed three-field format separated by `---`:
+    /// The effective actions in `dir`: plain executable files run as-is, plus
+    /// `.catalog` pointer files resolved to their catalog target. Both are
+    /// ordered by the *local* filename, so a pointer's `<order>---<icon>---<name>`
+    /// filename drives its display exactly like a local script. Pointers whose
+    /// catalog/item can't be resolved are dropped (they show nothing).
+    static func effectiveScripts(in dir: URL, root: URL) -> [EffectiveScript] {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        var out: [EffectiveScript] = []
+        for url in entries {
+            let name = url.lastPathComponent
+            if name.hasPrefix(".") || name.lowercased().hasPrefix("readme") { continue }
+            if Catalogs.isPointer(url) {
+                if let target = Catalogs.resolvePointer(at: url, root: root) {
+                    out.append(EffectiveScript(display: url, exec: target))
+                }
+                continue
+            }
+            let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+            if isRegular && fm.isExecutableFile(atPath: url.path) {
+                out.append(EffectiveScript(display: url, exec: url))
+            }
+        }
+        return out.sorted {
+            $0.display.lastPathComponent.localizedStandardCompare($1.display.lastPathComponent) == .orderedAscending
+        }
+    }
+
+    /// Filename → display title + icon. Filenames follow a fixed three-field
+    /// format separated by `---`, with the extension always required:
     ///
-    ///     <order>---<name>---<icon>.<ext>
+    ///     <order>---<icon>---<name>.<ext>
     ///
     /// - `order` is a sort key (e.g. `10`), stripped from the display name.
-    /// - `name` is shown verbatim (ordinary dashes/spaces are kept).
     /// - `icon` is an SF Symbol name (e.g. `bolt.fill`), used for the icon.
+    /// - `name` is shown verbatim (ordinary dashes/spaces are kept).
     ///
+    /// `icon` sits before `name` (and the extension is mandatory) so a dotted
+    /// SF Symbol name like `bolt.fill` can never be mistaken for the extension.
     /// The extension is removed first, then the base is split on `---`. A file
     /// that doesn't match (fewer than three fields) falls back to showing its
     /// whole base name with the default scroll icon.
@@ -54,10 +97,10 @@ nonisolated struct ScriptItems: Sendable {
             let fallback = base.trimmingCharacters(in: .whitespaces)
             return (fallback.isEmpty ? url.lastPathComponent : fallback, .script)
         }
-        // Tolerate `---` inside the name by joining the middle fields back.
-        let name = parts[1..<(parts.count - 1)].joined(separator: "---")
+        let iconName = parts[1].trimmingCharacters(in: .whitespaces)
+        // Tolerate `---` inside the name by joining the trailing fields back.
+        let name = parts[2...].joined(separator: "---")
             .trimmingCharacters(in: .whitespaces)
-        let iconName = parts[parts.count - 1].trimmingCharacters(in: .whitespaces)
         return (name.isEmpty ? url.lastPathComponent : name,
                 iconName.isEmpty ? .script : .custom(iconName))
     }
@@ -67,23 +110,23 @@ nonisolated struct ScriptItems: Sendable {
 
     // MARK: - Items
 
-    /// Lane-level actions from `<root>/.lanes/config/script-items`.
+    /// Lane-level actions from `<root>/.lanes/config/script`.
     func laneItems(root: URL, lane: Lane, ticket: TicketEnv?) -> [any Item] {
         let env = Self.laneEnv(for: lane, ticket: ticket)
-        return Self.executableFiles(in: LaneFS.scriptItemsDir(in: root)).map { url in
-            item(id: "script:\(url.path)", scriptURL: url, cwd: lane.url, env: env)
+        return Self.effectiveScripts(in: LaneFS.scriptDir(in: root), root: root).map { script in
+            item(id: "script:\(script.display.path)", script: script, cwd: lane.url, env: env)
         }
     }
 
     /// Per-repository actions, run in `repoURL`. `scripts` is the already-read
-    /// listing of `<root>/.lanes/config/script-items/repository` (read once and
-    /// reused across repos).
-    func repoItems(scripts: [URL], repoURL: URL, lane: Lane, ticket: TicketEnv?) -> [any Item] {
+    /// listing of `<root>/.lanes/config/script/repository` (read once and reused
+    /// across repos).
+    func repoItems(scripts: [EffectiveScript], repoURL: URL, lane: Lane, ticket: TicketEnv?) -> [any Item] {
         var env = Self.laneEnv(for: lane, ticket: ticket)
         env["REPO_DIR"] = repoURL.path
         env["REPO_NAME"] = repoURL.lastPathComponent
-        return scripts.map { url in
-            item(id: "repo:\(repoURL.path):script:\(url.path)", scriptURL: url, cwd: repoURL, env: env)
+        return scripts.map { script in
+            item(id: "repo:\(repoURL.path):script:\(script.display.path)", script: script, cwd: repoURL, env: env)
         }
     }
 
@@ -98,15 +141,15 @@ nonisolated struct ScriptItems: Sendable {
         return env
     }
 
-    private func item(id: String, scriptURL: URL, cwd: URL, env: [String: String]) -> any Item {
+    private func item(id: String, script: EffectiveScript, cwd: URL, env: [String: String]) -> any Item {
         let shell = self.shell
-        let path = scriptURL.path
-        let parsed = Self.parse(scriptURL)
+        let path = script.exec.path
+        let parsed = Self.parse(script.display)
         return BasicItem(
             id: id,
             title: parsed.title,
             icon: parsed.icon,
-            keywords: ["script", "run", scriptURL.lastPathComponent],
+            keywords: ["script", "run", script.display.lastPathComponent],
             run: {
                 // Silent: exec the file directly so its shebang chooses the
                 // interpreter; a nonzero exit throws ShellError (stderr → toast).

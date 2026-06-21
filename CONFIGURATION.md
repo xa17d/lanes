@@ -11,13 +11,19 @@ Drop files in the right place and they take effect immediately — there's no se
 └── .lanes/                  ← all Lanes-managed state for this root (hidden)
     ├── archive/             ← archived lanes move here
     │   └── old-lane/
+    ├── catalog/             ← subscribed catalogs (shared config git repos)
+    │   └── github.com_my-org_lanes-catalog/
+    │       ├── catalog.json ← { url, ref, pin, … }
+    │       └── checkout/    ← the git clone (a rebuildable cache)
     └── config/              ← user configuration (everything below is optional)
         ├── template/        ← seeds the contents of every new lane
-        ├── script-items/    ← custom actions (named <order>---<name>---<icon>.<ext>)
-        │   ├── 10---deploy---bolt.fill.sh         … a lane-level action
+        ├── template.catalog ← OR point the template at a catalog (pointer wins)
+        ├── script/          ← custom actions (named <order>---<icon>---<name>.<ext>)
+        │   ├── 10---bolt.fill---deploy.sh         … a local lane-level action
+        │   ├── 20---arrow.up---shared deploy.catalog … a catalog action (pointer)
         │   └── repository/                        … per-repository actions
-        │       └── 10---fetch---arrow.clockwise.sh
-        └── hooks/           ← lifecycle hooks (fixed names, run in order)
+        │       └── 10---arrow.clockwise---fetch.sh
+        └── hook/            ← lifecycle hooks (fixed names, run in order)
             ├── extract-ticket          … 1. link a ticket from the folder name
             └── update-lane-description … 2. set the description
 ```
@@ -44,34 +50,36 @@ Use it for files every lane should start with, e.g. a lane-wide `CLAUDE.md`.
 
 ---
 
-## Custom actions (script-items)
+## Custom actions (scripts)
 
-Make a file executable and drop it under `.lanes/config/script-items/` to add a custom action to the launcher.
+Make a file executable and drop it under `.lanes/config/script/` to add a custom action to the launcher.
 
-- **`.lanes/config/script-items/*`** — lane-level actions, shown in a **Scripts** section inside every lane.
+- **`.lanes/config/script/*`** — lane-level actions, shown in a **Scripts** section inside every lane.
   Run with the **lane folder** as the working directory.
-- **`.lanes/config/script-items/repository/*`** — per-repository actions, shown inside each discovered repo (these are the *only* per-repo actions — Open PR, Open Terminal here, and the editor/CI launchers all ship as examples here).
+- **`.lanes/config/script/repository/*`** — per-repository actions, shown inside each discovered repo (these are the *only* per-repo actions — Open PR, Open Terminal here, and the editor/CI launchers all ship as examples here).
   Run once per repo with that **repository's folder** as the working directory.
+
+Alongside your own scripts you can drop a **`.catalog` pointer** here that references a script in a [catalog](#catalogs) — see below.
 
 ### Rules
 
 - Only files with the **executable bit** are shown (`chmod +x <file>`).
   The file is executed directly, so its **shebang** picks the interpreter (bash, Python, Node, …).
   Dotfiles and `README*` are ignored.
-- The filename follows a three-field format separated by `---`:
+- The filename follows a three-field format separated by `---`, and the extension is always required:
 
   ```
-  <order>---<name>---<icon>.<ext>
+  <order>---<icon>---<name>.<ext>
   ```
 
   - **`order`** — sort key (e.g. `10`); stripped from the display.
-  - **`name`** — shown **verbatim** (dashes/spaces kept).
   - **`icon`** — an [SF Symbol](https://developer.apple.com/sf-symbols/) name (e.g. `bolt.fill`); an invalid name falls back to the scroll glyph.
+  - **`name`** — shown **verbatim** (dashes/spaces kept).
 
-  So `10---deploy to prod---bolt.fill.sh` shows as **deploy to prod** with the `bolt.fill` icon.
+  So `10---bolt.fill---deploy to prod.sh` shows as **deploy to prod** with the `bolt.fill` icon.
   A file not matching the format shows its whole base name with the scroll icon.
 
-  > Always include an extension (`.sh`, `.py`, …) when the icon name has dots, or the icon's last `.segment` is taken as the extension.
+  > `icon` comes before `name`, and the extension is mandatory, so a dotted SF Symbol name like `bolt.fill` can never be confused with the file extension.
 - Scripts run **silently**: on success the panel closes; a **non-zero exit** surfaces the script's stderr as an error toast.
 
 ### Environment
@@ -93,7 +101,7 @@ Scripts inherit your environment (so `PATH` etc. are intact) plus:
 
 ### Example
 
-`.lanes/config/script-items/10---open ticket---link.sh` (shows as **open ticket** with the `link` icon):
+`.lanes/config/script/10---link---open ticket.sh` (shows as **open ticket** with the `link` icon):
 
 ```sh
 #!/usr/bin/env bash
@@ -101,7 +109,7 @@ set -euo pipefail
 open "${TICKET_URL:?No ticket linked to this lane}"
 ```
 
-`.lanes/config/script-items/repository/10---fetch---arrow.triangle.2.circlepath.sh` (shows as **fetch** inside each repo):
+`.lanes/config/script/repository/10---arrow.triangle.2.circlepath---fetch.sh` (shows as **fetch** inside each repo):
 
 ```sh
 #!/usr/bin/env bash
@@ -110,8 +118,8 @@ git -C "$REPO_DIR" fetch --all --prune
 ```
 
 ```sh
-chmod +x ".lanes/config/script-items/10---open ticket---link.sh"
-chmod +x ".lanes/config/script-items/repository/10---fetch---arrow.triangle.2.circlepath.sh"
+chmod +x ".lanes/config/script/10---link---open ticket.sh"
+chmod +x ".lanes/config/script/repository/10---arrow.triangle.2.circlepath---fetch.sh"
 ```
 
 ---
@@ -150,7 +158,7 @@ No-op without the hook; see [Hooks](#hooks).
 
 ## Hooks
 
-Executable scripts in `.lanes/config/hooks/` run at specific moments.
+Executable scripts in `.lanes/config/hook/` run at specific moments.
 Both hooks below fire **when a lane is created** and **whenever you press ⌘R** (at the lane list this refreshes every listed lane; inside a lane, just the open one — folders adopted from outside the app catch up on the next ⌘R).
 `update-lane-description` also re-runs on its own when its description sets a [`{{refresh:…}}`](#refreshduration--auto-refresh) interval.
 Each runs with the **lane folder** as the working directory and the `LANE_DIR` / `LANE_NAME` / `LANE_ID` variables exported.
@@ -166,7 +174,7 @@ A hook that's missing, not executable, or prints nothing (after trimming) is a n
 
 Its **stdout** (trimmed) is treated as a ticket key and linked to the lane — the same as typing it into **Link ticket…**.
 Linking is idempotent by key, so running on every ⌘R never creates duplicates, and manually linked tickets are left alone.
-The linked ticket shows in the lane's **Tickets** section and is exported to script-items as `$TICKET_KEY` / `$TICKET_URL`.
+The linked ticket shows in the lane's **Tickets** section and is exported to scripts as `$TICKET_KEY` / `$TICKET_URL`.
 
 This example links a leading issue key derived from the folder name — 2+ uppercase letters, a dash, then digits (e.g. `ABC-1234-add-login` → `ABC-1234`):
 
@@ -179,7 +187,7 @@ fi
 ```
 
 ```sh
-chmod +x .lanes/config/hooks/extract-ticket
+chmod +x .lanes/config/hook/extract-ticket
 ```
 
 ### `update-lane-description`
@@ -187,7 +195,7 @@ chmod +x .lanes/config/hooks/extract-ticket
 Its **stdout** becomes the lane's description, so it can include any [directive](#lane-descriptions-and-directives) — a `{{badge:…}}` pill and/or a `{{refresh:…}}` interval to keep itself up to date.
 It also receives `$TICKET_KEY` / `$TICKET_URL` for the ticket `extract-ticket` linked.
 
-`.lanes/config/hooks/update-lane-description`:
+`.lanes/config/hook/update-lane-description`:
 
 ```sh
 #!/usr/bin/env bash
@@ -202,5 +210,59 @@ fi
 ```
 
 ```sh
-chmod +x .lanes/config/hooks/update-lane-description
+chmod +x .lanes/config/hook/update-lane-description
 ```
+
+---
+
+## Catalogs
+
+A **catalog** is a git repository of shared config — scripts, hooks, and a template — that you subscribe to so a team can share actions and roll out updates.
+Manage catalogs in **Settings**: add a git URL, and Lanes clones it under `.lanes/catalog/<id>/checkout/`.
+
+The split is deliberate:
+
+- the **catalog** (the git repo) holds the shared **content**;
+- your **local config** holds thin **`.catalog` pointer** files that select, order, and style which catalog items you actually use.
+
+A catalog repo mirrors the config layout with plainly-named files:
+
+```
+script/deploy.sh
+script/repository/open-pr.sh
+hook/update-lane-description
+template/CLAUDE.md
+```
+
+### Pointing local config at a catalog item
+
+A `.catalog` file is JSON that locates a catalog item; its **own filename** supplies the display order/icon/name (exactly like a local script):
+
+`.lanes/config/script/20---arrow.up---shared deploy.catalog`
+
+```json
+{ "catalog": "github.com_my-org_lanes-catalog", "item": "script/deploy.sh" }
+```
+
+- `catalog` — the catalog id (the `.lanes/catalog/<id>/` folder name).
+- `item` — the path of the target **inside the catalog repo**.
+
+The same mechanism works for singletons:
+
+- **Hooks** — `hook/extract-ticket.catalog` / `hook/update-lane-description.catalog`.
+- **Template** — `config/template.catalog` (with `"item": "template"`).
+
+For these singletons the **pointer wins** when both a pointer and a local file exist — delete the pointer to fall back to your local version.
+For scripts, local files and pointers simply coexist.
+
+> A `.catalog` pointer whose catalog or item can't be found just shows nothing (for a script) or falls back to local (for a hook/template) — so a removed catalog never breaks the launcher.
+
+### Updating
+
+Lanes **fetches** catalogs in the background (a stale one about once a day) and when you press **Sync Now**, but it never changes what runs on its own.
+When a fetch finds new commits, a dot appears on the menu-bar icon and the catalog shows **Update available** in Settings; click **Apply** to advance to the new version.
+Each catalog records the **ref** it tracks (a branch, tag, or commit — blank means the default branch) and the exact commit it's pinned to.
+
+> ⚠️ **A catalog runs shared code on your machine.**
+> Its scripts, hooks, and template execute with your environment, and applying an update runs newly-fetched code.
+> Only subscribe to catalogs from people you trust — Lanes shows this warning once, before your first catalog is added.
