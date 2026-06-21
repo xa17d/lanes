@@ -20,8 +20,8 @@ nonisolated struct ITermController: Sendable {
 
     private static let appName = "iTerm"
 
-    /// Find a session whose name contains the sentinel and select it; else
-    /// create a window, name it, cd, and run `command` (if any).
+    /// Find the session tagged with the sentinel and focus it; else create a
+    /// window, tag it, cd, and run `command` (if any).
     @discardableResult
     func openOrCreate(laneID: UUID, tag: String, cwd: URL, command: String?) throws -> String {
         let sentinel = "«lane:\(laneID.uuidString):\(tag)»"
@@ -41,6 +41,19 @@ nonisolated struct ITermController: Sendable {
 
     // Tag/lookup uses the `user.lane` session variable (not the volatile
     // session name). Reading an unset variable can error, so guard it.
+    //
+    // Focus ordering matters: `select w` followed by app-level `activate` does
+    // NOT reliably foreground the chosen window when another iTerm window is
+    // already key — `activate` re-asserts the previously-frontmost window and
+    // the wrong one stays on top. To land on the right window without flashing
+    // the wrong one:
+    //   1. Pre-select the matched window/tab/session BEFORE foregrounding, so the
+    //      target is already iTerm's current window when it comes forward.
+    //   2. `activate` to foreground iTerm.
+    //   3. Short delay to let the window-server foreground race settle.
+    //   4. Re-select the same window LAST (re-matched by sentinel, since iTerm
+    //      window references don't survive being held across the activate) so the
+    //      window selection is the final, authoritative action.
     private static let script = """
     tell application "iTerm2"
         repeat with w in windows
@@ -51,10 +64,26 @@ nonisolated struct ITermController: Sendable {
                         tell s to set theTag to (variable named "user.lane")
                     end try
                     if theTag is "%SENTINEL%" then
-                        select w
                         tell t to select
                         tell s to select
+                        select w
                         activate
+                        delay 0.15
+                        repeat with w2 in windows
+                            repeat with t2 in tabs of w2
+                                repeat with s2 in sessions of t2
+                                    set tg2 to ""
+                                    try
+                                        tell s2 to set tg2 to (variable named "user.lane")
+                                    end try
+                                    if tg2 is "%SENTINEL%" then
+                                        tell t2 to select
+                                        tell s2 to select
+                                        select w2
+                                    end if
+                                end repeat
+                            end repeat
+                        end repeat
                         return "focused"
                     end if
                 end repeat
