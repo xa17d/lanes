@@ -1,4 +1,6 @@
-#\!/usr/bin/env bash
-# Reveal this repository in Finder. (Per-repository script-item.)
+#!/usr/bin/env bash
+# Open this repository in Finder. (Per-repository script-item.)
+# Opens the repo folder itself in a Finder window (not `open -R`, which would
+# only select it inside its parent).
 set -euo pipefail
-open -R "${REPO_DIR:-$PWD}"
+open "${REPO_DIR:-$PWD}"

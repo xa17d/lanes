@@ -1,4 +1,6 @@
-#\!/usr/bin/env bash
-# Reveal this lane's folder in Finder. (Lane-level script-item; cwd = lane dir.)
+#!/usr/bin/env bash
+# Open this lane's folder in Finder. (Lane-level script-item; cwd = lane dir.)
+# Opens the folder itself in a Finder window (not `open -R`, which would only
+# select it inside its parent).
 set -euo pipefail
-open -R "${LANE_DIR:-$PWD}"
+open "${LANE_DIR:-$PWD}"
