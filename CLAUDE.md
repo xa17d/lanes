@@ -4,7 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Lanes is a keyboard-first macOS launcher for switching between parallel work "lanes". See `README.md` for the user-facing feature set, and `CONFIGURATION.md` for the user-facing reference on the `<root>/.lanes/` config surface (templates, script-items, descriptions/status badges, hooks) — keep that doc in sync when changing any of those behaviors.
 
-Note: the app/product is named **Lanes** (`PRODUCT_NAME = Lanes`), so the built bundle is `Lanes.app` and the binary is `Lanes`. The Xcode target, scheme, project file (`lane.xcodeproj`) and source folder (`lane/`) keep the internal name `lane`, and the bundle id stays `at.xa1.lane`.
+Note: the app/product is named **Lanes** (`PRODUCT_NAME = Lanes`), so the built bundle is `Lanes.app` and the binary is `Lanes`. The Xcode target, scheme, project file (`Lanes.xcodeproj`) and source folder (`Lanes/`) all use the name `Lanes`, and the bundle id is `at.xa1.lanes`. (The `Lane` type, the `.lane/lane.json` per-lane metadata folder, and the `LANE_DIR`/`LANE_NAME`/`LANE_ID` script env vars refer to the *lane entity*, not the app, and keep the singular `lane`/`LANE_` naming.)
+
+## Way of working
+
+The user drives this repo by sending tasks. Process them like this:
+
+- Tasks arrive one at a time, but the user may send several at once — **queue them and process one after the other.**
+- For each task: implement → review your own changes → test (build + `swiftc` harness for logic; run the app for UI/AppleScript/hotkey behavior) → iterate until the implementation both looks right and works.
+- Then **commit and push directly on `main`** (no PR/branch needed) before moving to the next task. End commit messages with the `Co-Authored-By` trailer.
 
 ## Build & run
 
@@ -12,20 +20,20 @@ Note: the app/product is named **Lanes** (`PRODUCT_NAME = Lanes`), so the built 
 # Build. The -derivedDataPath is REQUIRED: xcodebuild's build daemon cannot
 # write to the default ~/Library/Developer/Xcode/DerivedData location under the
 # command sandbox (fails even in $TMPDIR), so point it into the repo.
-xcodebuild -project lane.xcodeproj -scheme lane -configuration Debug \
+xcodebuild -project Lanes.xcodeproj -scheme Lanes -configuration Debug \
   -destination 'platform=macOS' -derivedDataPath ./.build \
   -clonedSourcePackagesDirPath ./.build/spm build
 
 # Run the built app (it's an LSUIElement accessory: NO Dock icon, NO window on
 # launch — it adds a menu-bar item + the ⌥Space hotkey). Useful env overrides:
-#   LANE_ROOT=/path/to/lanes   skip the Settings root picker
-#   LANE_AUTOSHOW=1             show the panel immediately (headless smoke test)
-LANE_ROOT=/tmp/lanes LANE_AUTOSHOW=1 ./.build/Build/Products/Debug/Lanes.app/Contents/MacOS/Lanes
+#   LANES_ROOT=/path/to/lanes  skip the Settings root picker
+#   LANES_AUTOSHOW=1            show the panel immediately (headless smoke test)
+LANES_ROOT=/tmp/lanes LANES_AUTOSHOW=1 ./.build/Build/Products/Debug/Lanes.app/Contents/MacOS/Lanes
 ```
 
 `xcodebuild` needs the sandbox disabled (its daemon writes outside any allowed path). `.build/` is gitignored. The one SPM dependency (KeyboardShortcuts) resolves on first build.
 
-A smoke run under the command sandbox is **safe for the user's prefs**: `UserDefaults` writes (including the `rootPath` that `LANE_ROOT` sets) get redirected into `~/Library/Containers/at.xa1.lane/…`, not the real `~/Library/Preferences/at.xa1.lane.plist`. So `LANE_ROOT` smoke tests never clobber the user's configured root — but it also means you can't read smoke-test prefs back from the real domain.
+A smoke run under the command sandbox is **safe for the user's prefs**: `UserDefaults` writes (including the `rootPath` that `LANES_ROOT` sets) get redirected into `~/Library/Containers/at.xa1.lanes/…`, not the real `~/Library/Preferences/at.xa1.lanes.plist`. So `LANES_ROOT` smoke tests never clobber the user's configured root — but it also means you can't read smoke-test prefs back from the real domain.
 
 ## Testing
 
@@ -39,8 +47,8 @@ There is **no XCTest target.** Logic is verified with throwaway `swiftc` harness
 # enables this by default; swiftc does not).
 cp /tmp/main.swift ./.build/main.swift
 swiftc -parse-as-library -enable-bare-slash-regex -o ./.build/t \
-  lane/Model/*.swift lane/Design/Icons.swift lane/Services/*.swift \
-  lane/Providers/*.swift lane/Search/*.swift lane/UI/LaneModel.swift \
+  Lanes/Model/*.swift Lanes/Design/Icons.swift Lanes/Services/*.swift \
+  Lanes/Providers/*.swift Lanes/Search/*.swift Lanes/UI/LaneModel.swift \
   ./.build/main.swift && ./.build/t
 ```
 
@@ -50,7 +58,7 @@ This works because the model/service/provider layers are `nonisolated` and UI-fr
 
 ## Project structure mechanics
 
-The Xcode target uses a `PBXFileSystemSynchronizedRootGroup`: **any `.swift` file added under `lane/` is automatically compiled — no `project.pbxproj` edits needed** for new sources. pbxproj surgery is only required for SPM packages or build-setting changes. Folders mirror the layers: `App/ Window/ Model/ Providers/ Services/ Search/ UI/ Design/`.
+The Xcode target uses a `PBXFileSystemSynchronizedRootGroup`: **any `.swift` file added under `Lanes/` is automatically compiled — no `project.pbxproj` edits needed** for new sources. pbxproj surgery is only required for SPM packages or build-setting changes. Folders mirror the layers: `App/ Window/ Model/ Providers/ Services/ Search/ UI/ Design/`.
 
 ## Architecture
 
@@ -72,4 +80,4 @@ Four layers, nothing below couples to anything above:
 - **`Item.isSecondary`** demotes "meta" actions (`Link Jira ticket…`, `Manage lane…`) below genuine content in `SubtreeIndex.search`, which sorts primary matches first then secondary, each by fuzzy score. Set it on add/manage-style items so a query like "jira" surfaces real tickets before the link action.
 - **Panel show uses `reopen()`, not `reset()`.** `reset()` hard-resets to the lane list; `reopen()` keeps the in-memory navigation stack so the ⌥Space hotkey returns you where you left off (a process restart starts empty = root). `reopen()` refreshes the root list and falls back to `reset()` if the lane you were in vanished on disk.
 - **AppleScript lives only in `ChromeController` / `ITermController`** as escaped string templates — treat those scripts as load-bearing and don't paraphrase them. iTerm sessions are tagged by name with the sentinel `«lane:<laneID>:<tag>»`; keep it stable. Error `-1743` maps to `AutomationError.notAuthorized`.
-- **No sandbox** (`ENABLE_APP_SANDBOX = NO`) — the app runs `git` and drives other apps via Apple Events. Bundle id `at.xa1.lane` must stay stable (TCC Automation grants are tied to it).
+- **No sandbox** (`ENABLE_APP_SANDBOX = NO`) — the app runs `git` and drives other apps via Apple Events. Bundle id `at.xa1.lanes` must stay stable (TCC Automation grants are tied to it).
