@@ -80,9 +80,10 @@ private struct CatalogRow: View {
     var body: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(catalog.id).font(.system(size: 12, weight: .medium))
-                Text("\(catalog.config.ref) · \(String(catalog.config.pin.prefix(7)))")
+                Text(catalog.name).font(.system(size: 12, weight: .medium))
+                Text("\(catalog.config.url) · \(catalog.config.ref) · \(String(catalog.config.pin.prefix(7)))")
                     .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
             }
             Spacer()
             if catalog.hasUpdate {
@@ -176,7 +177,7 @@ struct ConfigEditorSection: View {
                     Text("No items in your catalogs")
                 } else {
                     ForEach(available) { item in
-                        Button("\(item.name)  ·  \(item.catalog)") {
+                        Button("\(item.name)  ·  \(model.name(for: item.catalog))") {
                             try? ConfigEdits.addPointer(in: dir, catalog: item.catalog,
                                                         item: item.item, name: item.name, icon: "scroll")
                             reload()
@@ -193,7 +194,7 @@ struct ConfigEditorSection: View {
                     .frame(width: 18)
                     .foregroundStyle(.secondary)
                 Text(entry.name)
-                Text(entry.pointer.catalog).font(.caption).foregroundStyle(.secondary)
+                Text(model.name(for: entry.pointer.catalog)).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button { move(entries, index, by: -1) } label: { Image(systemName: "chevron.up") }
                     .buttonStyle(.borderless).disabled(index == 0)
@@ -225,7 +226,7 @@ struct ConfigEditorSection: View {
         LabeledContent(name) {
             HStack {
                 if let pointer = ConfigEdits.hookPointer(name, root: root) {
-                    Text("→ \(pointer.catalog)").font(.caption).foregroundStyle(.secondary)
+                    Text("→ \(model.name(for: pointer.catalog))").font(.caption).foregroundStyle(.secondary)
                     Button("Clear") { try? ConfigEdits.clearHookPointer(name, root: root); reload() }
                 } else {
                     Menu("Set from catalog") {
@@ -235,7 +236,7 @@ struct ConfigEditorSection: View {
                             Text("No “\(name)” in your catalogs")
                         } else {
                             ForEach(available) { item in
-                                Button(item.catalog) {
+                                Button(model.name(for: item.catalog)) {
                                     try? ConfigEdits.setHookPointer(name, catalog: item.catalog,
                                                                     item: item.item, root: root)
                                     reload()
@@ -254,7 +255,7 @@ struct ConfigEditorSection: View {
         LabeledContent("template") {
             HStack {
                 if let pointer = ConfigEdits.templatePointer(root: root) {
-                    Text("→ \(pointer.catalog)").font(.caption).foregroundStyle(.secondary)
+                    Text("→ \(model.name(for: pointer.catalog))").font(.caption).foregroundStyle(.secondary)
                     Button("Clear") { try? ConfigEdits.clearTemplatePointer(root: root); reload() }
                 } else {
                     Menu("Set from catalog") {
@@ -263,7 +264,7 @@ struct ConfigEditorSection: View {
                             Text("No template in your catalogs")
                         } else {
                             ForEach(available, id: \.self) { id in
-                                Button(id) {
+                                Button(model.name(for: id)) {
                                     try? ConfigEdits.setTemplatePointer(catalog: id, root: root)
                                     reload()
                                 }

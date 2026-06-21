@@ -225,9 +225,11 @@ The split is deliberate:
 - the **catalog** (the git repo) holds the shared **content**;
 - your **local config** holds thin **`.catalog` pointer** files that select, order, and style which catalog items you actually use.
 
-A catalog repo mirrors the config layout with plainly-named files:
+A catalog repo **must** carry a `lanes-catalog.json` at its root declaring a human-facing name; a repo without one is rejected when you try to add it.
+That name is what Settings shows for the catalog (instead of the on-disk folder id).
 
 ```
+lanes-catalog.json        { "name": "My team's actions" }
 script/deploy.sh
 script/repository/open-pr.sh
 hook/update-lane-description

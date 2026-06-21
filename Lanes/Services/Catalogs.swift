@@ -24,12 +24,15 @@ import Foundation
 
 nonisolated enum CatalogError: LocalizedError {
     case invalidURL(String)
+    case notACatalog(String)
     case notFound(String)
     case gitFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidURL(let url): return "“\(url)” isn’t a recognizable git URL."
+        case .notACatalog(let url):
+            return "“\(url)” isn’t a Lanes catalog (it needs a lanes-catalog.json with a name at its root)."
         case .notFound(let id): return "Catalog “\(id)” not found."
         case .gitFailed(let msg): return msg
         }
@@ -54,11 +57,13 @@ nonisolated enum Catalogs {
         var latest: String?
     }
 
-    /// A loaded catalog: its id (the folder name), descriptor, and owning root.
+    /// A loaded catalog: its id (the folder name), descriptor, owning root, and
+    /// the human-facing name from the catalog's `lanes-catalog.json` manifest.
     nonisolated struct Loaded: Sendable, Identifiable {
         let id: String
         let config: Config
         let root: URL
+        let name: String
         var checkout: URL { LaneFS.catalogCheckout(id: id, in: root) }
         var hasUpdate: Bool {
             guard let latest = config.latest else { return false }
@@ -70,6 +75,19 @@ nonisolated enum Catalogs {
     nonisolated struct Pointer: Codable, Sendable {
         let catalog: String
         let item: String
+    }
+
+    /// `lanes-catalog.json` at a catalog repo's root — required, and the source
+    /// of the human-facing name shown instead of the folder id.
+    nonisolated struct Manifest: Codable, Sendable {
+        var name: String
+    }
+
+    static let manifestFilename = "lanes-catalog.json"
+
+    /// Read a catalog's `lanes-catalog.json` manifest from its checkout.
+    static func manifest(forCheckout checkout: URL) -> Manifest? {
+        JSONFile.read(Manifest.self, at: checkout.appendingPathComponent(manifestFilename))
     }
 
     // MARK: - Identity
@@ -122,8 +140,10 @@ nonisolated enum Catalogs {
         ) else { return [] }
         return entries.compactMap { sub -> Loaded? in
             let isDir = (try? sub.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            guard isDir, let cfg = config(id: sub.lastPathComponent, root: root) else { return nil }
-            return Loaded(id: sub.lastPathComponent, config: cfg, root: root)
+            let id = sub.lastPathComponent
+            guard isDir, let cfg = config(id: id, root: root) else { return nil }
+            let name = manifest(forCheckout: LaneFS.catalogCheckout(id: id, in: root))?.name ?? id
+            return Loaded(id: id, config: cfg, root: root, name: name)
         }
         .sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
     }
@@ -149,10 +169,17 @@ nonisolated enum Catalogs {
         if !trimmedRef.isEmpty {
             try git(["-C", checkout.path, "checkout", "--force", trimmedRef], shell: shell)
         }
+        // A catalog must declare itself with a named lanes-catalog.json manifest.
+        guard let name = manifest(forCheckout: checkout)?.name
+            .trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+            try? fm.removeItem(at: dir)
+            throw CatalogError.notACatalog(url)
+        }
         let resolvedRef = trimmedRef.isEmpty
             ? (revParse(checkout, "--abbrev-ref", "HEAD", shell: shell) ?? "main")
             : trimmedRef
         guard let pin = revParse(checkout, "HEAD", shell: shell) else {
+            try? fm.removeItem(at: dir)
             throw CatalogError.gitFailed("Could not resolve HEAD after cloning \(url).")
         }
         let cfg = Config(url: url, ref: resolvedRef, pin: pin, lastFetchedAt: Date(), latest: pin)

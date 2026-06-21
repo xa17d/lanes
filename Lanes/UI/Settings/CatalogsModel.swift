@@ -205,6 +205,12 @@ final class CatalogsModel: ObservableObject {
     var root: URL? { library.root }
     var hasUpdates: Bool { catalogs.contains(where: \.hasUpdate) }
 
+    /// Human-facing name for a catalog id (from its manifest), falling back to
+    /// the id when the catalog isn't loaded.
+    func name(for id: String) -> String {
+        catalogs.first { $0.id == id }?.name ?? id
+    }
+
     /// Whether the one-time "running catalog code" warning has been acknowledged.
     static var trustAcknowledged: Bool {
         get { UserDefaults.standard.bool(forKey: SettingsKeys.catalogTrustAcknowledged) }
