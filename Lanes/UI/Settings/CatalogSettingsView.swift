@@ -179,9 +179,10 @@ struct ConfigEditorSection: View {
                     ForEach(available) { item in
                         Button("\(item.name)  ·  \(model.name(for: item.catalog))") {
                             try? ConfigEdits.addPointer(in: dir, catalog: item.catalog,
-                                                        item: item.item, name: item.name, icon: "scroll")
+                                                        item: item.item, name: item.name, icon: item.icon)
                             reload()
                         }
+                        .help(item.detail ?? "")
                     }
                 }
             }
@@ -230,17 +231,17 @@ struct ConfigEditorSection: View {
                     Button("Clear") { try? ConfigEdits.clearHookPointer(name, root: root); reload() }
                 } else {
                     Menu("Set from catalog") {
-                        let available = ConfigEdits.available(root: root, subdir: "hook")
-                            .filter { $0.name == name }
+                        let available = ConfigEdits.available(root: root, subdir: "hook/\(name)")
                         if available.isEmpty {
                             Text("No “\(name)” in your catalogs")
                         } else {
                             ForEach(available) { item in
-                                Button(model.name(for: item.catalog)) {
+                                Button("\(item.name)  ·  \(model.name(for: item.catalog))") {
                                     try? ConfigEdits.setHookPointer(name, catalog: item.catalog,
                                                                     item: item.item, root: root)
                                     reload()
                                 }
+                                .help(item.detail ?? "")
                             }
                         }
                     }
@@ -259,15 +260,17 @@ struct ConfigEditorSection: View {
                     Button("Clear") { try? ConfigEdits.clearTemplatePointer(root: root); reload() }
                 } else {
                     Menu("Set from catalog") {
-                        let available = ConfigEdits.availableTemplates(root: root)
+                        let available = ConfigEdits.available(root: root, subdir: "template")
                         if available.isEmpty {
                             Text("No template in your catalogs")
                         } else {
-                            ForEach(available, id: \.self) { id in
-                                Button(model.name(for: id)) {
-                                    try? ConfigEdits.setTemplatePointer(catalog: id, root: root)
+                            ForEach(available) { item in
+                                Button("\(item.name)  ·  \(model.name(for: item.catalog))") {
+                                    try? ConfigEdits.setTemplatePointer(catalog: item.catalog,
+                                                                        item: item.item, root: root)
                                     reload()
                                 }
+                                .help(item.detail ?? "")
                             }
                         }
                     }

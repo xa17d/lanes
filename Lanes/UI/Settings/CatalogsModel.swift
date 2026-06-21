@@ -17,12 +17,15 @@ import Combine
 // MARK: - Filesystem edits (pure, off-main safe)
 
 nonisolated enum ConfigEdits {
-    /// A catalog item available to be referenced (one file under a catalog's
-    /// `script/`, `script/repository/`, or `hook/`).
+    /// A catalog item available to be referenced — one item *folder* under a
+    /// catalog's `script/`, `script/repository/`, `hook/<role>/`, or `template/`,
+    /// with its `lanes-item.json` companion (default name/icon + description).
     nonisolated struct Available: Identifiable, Sendable, Hashable {
-        let catalog: String      // catalog id
-        let item: String         // repo-relative path, e.g. "script/deploy.sh"
-        var name: String { ((item as NSString).lastPathComponent as NSString).deletingPathExtension }
+        let catalog: String       // catalog id
+        let item: String          // repo-relative folder path, e.g. "script/open-pr"
+        let name: String          // companion name, else the folder name
+        let icon: String          // companion icon, else "scroll"
+        let detail: String?       // companion description
         var id: String { "\(catalog)/\(item)" }
     }
 
@@ -41,33 +44,34 @@ nonisolated enum ConfigEdits {
 
     // MARK: Enumeration
 
-    /// Catalog items under `subdir` (e.g. `"script"`, `"script/repository"`,
-    /// `"hook"`) across every subscribed catalog. Skips dot/README files and
-    /// sub-directories.
+    /// Catalog item folders under `subdir` (e.g. `"script"`,
+    /// `"script/repository"`, `"hook/<role>"`, `"template"`) across every
+    /// subscribed catalog, each read together with its companion. Skips the
+    /// reserved `script/repository` folder when listing lane scripts, and any
+    /// dot/README entries.
     static func available(root: URL, subdir: String) -> [Available] {
         Catalogs.list(root: root).flatMap { catalog -> [Available] in
             let dir = catalog.checkout.appendingPathComponent(subdir, isDirectory: true)
             guard let entries = try? fm.contentsOfDirectory(
-                at: dir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]
+                at: dir, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
             ) else { return [] }
-            return entries.compactMap { url in
-                let name = url.lastPathComponent
-                if name.hasPrefix(".") || name.lowercased().hasPrefix("readme") { return nil }
-                let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-                guard isRegular else { return nil }
-                return Available(catalog: catalog.id, item: "\(subdir)/\(name)")
+            return entries.compactMap { folder -> Available? in
+                let leaf = folder.lastPathComponent
+                if leaf.hasPrefix(".") || leaf.lowercased().hasPrefix("readme") { return nil }
+                if subdir == "script" && leaf == "repository" { return nil }   // reserved
+                let isDir = (try? folder.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                guard isDir else { return nil }
+                let meta = Catalogs.itemMeta(at: folder)
+                return Available(
+                    catalog: catalog.id,
+                    item: "\(subdir)/\(leaf)",
+                    name: meta?.name?.trimmedNonEmpty ?? leaf,
+                    icon: meta?.icon?.trimmedNonEmpty ?? defaultIcon,
+                    detail: meta?.description?.trimmedNonEmpty
+                )
             }
         }
         .sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
-    }
-
-    /// Catalog ids that ship a `template/` directory.
-    static func availableTemplates(root: URL) -> [String] {
-        Catalogs.list(root: root).compactMap { catalog in
-            let dir = catalog.checkout.appendingPathComponent("template", isDirectory: true)
-            let isDir = (try? dir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            return isDir ? catalog.id : nil
-        }
     }
 
     /// The `.catalog` pointer entries enabled in `dir`, in display order.
@@ -147,8 +151,8 @@ nonisolated enum ConfigEdits {
         JSONFile.read(Catalogs.Pointer.self, at: LaneFS.templatePointer(in: root))
     }
 
-    static func setTemplatePointer(catalog: String, root: URL) throws {
-        try writePointer(Catalogs.Pointer(catalog: catalog, item: "template"),
+    static func setTemplatePointer(catalog: String, item: String, root: URL) throws {
+        try writePointer(Catalogs.Pointer(catalog: catalog, item: item),
                          to: LaneFS.templatePointer(in: root))
     }
 
@@ -183,6 +187,14 @@ nonisolated enum ConfigEdits {
         let icon = parts[1].trimmingCharacters(in: .whitespaces)
         let name = parts[2...].joined(separator: "---").trimmingCharacters(in: .whitespaces)
         return (order, icon.isEmpty ? defaultIcon : icon, name.isEmpty ? base : name)
+    }
+}
+
+private extension String {
+    /// The string trimmed of surrounding whitespace, or nil when that's empty.
+    nonisolated var trimmedNonEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
 

@@ -230,11 +230,13 @@ nonisolated enum LaneFS {
     private static func applyTemplateIfPresent(to laneURL: URL) {
         let root = laneURL.deletingLastPathComponent()
         let pointer = templatePointer(in: root)
-        let template = Catalogs.resolvePointer(at: pointer, root: root) ?? templateDir(in: root)
+        let template = Catalogs.resolveItemFolder(at: pointer, root: root) ?? templateDir(in: root)
         guard let entries = try? fm.contentsOfDirectory(
             at: template, includingPropertiesForKeys: nil, options: []
         ) else { return }
-        for entry in entries {
+        // A catalog template item folder also holds a lanes-item.json companion;
+        // it's metadata, not template content, so never seed it into the lane.
+        for entry in entries where entry.lastPathComponent != Catalogs.itemManifestFilename {
             let dest = laneURL.appendingPathComponent(entry.lastPathComponent)
             guard !fm.fileExists(atPath: dest.path) else { continue }
             try? fm.copyItem(at: entry, to: dest)

@@ -110,8 +110,7 @@ nonisolated struct LaneHooks: Sendable {
         let fm = FileManager.default
         let pointer = dir.appendingPathComponent("\(name).\(Catalogs.pointerExtension)")
         if fm.fileExists(atPath: pointer.path),
-           let target = Catalogs.resolvePointer(at: pointer, root: root),
-           fm.isExecutableFile(atPath: target.path) {
+           let target = Catalogs.resolveExecutable(at: pointer, root: root) {
             return target
         }
         let local = dir.appendingPathComponent(name)

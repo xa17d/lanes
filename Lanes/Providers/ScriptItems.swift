@@ -61,7 +61,7 @@ nonisolated struct ScriptItems: Sendable {
             let name = url.lastPathComponent
             if name.hasPrefix(".") || name.lowercased().hasPrefix("readme") { continue }
             if Catalogs.isPointer(url) {
-                if let target = Catalogs.resolvePointer(at: url, root: root) {
+                if let target = Catalogs.resolveExecutable(at: url, root: root) {
                     out.append(EffectiveScript(display: url, exec: target))
                 }
                 continue

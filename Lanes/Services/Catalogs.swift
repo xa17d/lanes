@@ -90,6 +90,17 @@ nonisolated enum Catalogs {
         JSONFile.read(Manifest.self, at: checkout.appendingPathComponent(manifestFilename))
     }
 
+    /// `lanes-item.json` inside a catalog item folder — the per-item companion
+    /// giving a default display name/icon and a user-facing description. All
+    /// fields optional (the folder name and a scroll icon are the fallbacks).
+    nonisolated struct ItemMeta: Codable, Sendable {
+        var name: String?
+        var icon: String?
+        var description: String?
+    }
+
+    static let itemManifestFilename = "lanes-item.json"
+
     // MARK: - Identity
 
     /// Stable, filesystem-safe on-disk id for a git URL. Recognizable remotes
@@ -118,13 +129,40 @@ nonisolated enum Catalogs {
         url.pathExtension == pointerExtension
     }
 
-    /// Resolve a `.catalog` pointer to the target path inside its catalog's
-    /// checkout, or nil when the pointer/catalog/item is missing or invalid.
-    static func resolvePointer(at url: URL, root: URL) -> URL? {
+    /// Resolve a `.catalog` pointer to its catalog **item folder** inside the
+    /// checkout (`<checkout>/<item>`), or nil when missing/invalid. Each catalog
+    /// item is a folder holding a payload plus a `lanes-item.json` companion.
+    static func resolveItemFolder(at url: URL, root: URL) -> URL? {
         guard let pointer = JSONFile.read(Pointer.self, at: url) else { return nil }
-        let target = LaneFS.catalogCheckout(id: pointer.catalog, in: root)
+        let folder = LaneFS.catalogCheckout(id: pointer.catalog, in: root)
             .appendingPathComponent(pointer.item)
-        return fm.fileExists(atPath: target.path) ? target : nil
+        var isDir: ObjCBool = false
+        return (fm.fileExists(atPath: folder.path, isDirectory: &isDir) && isDir.boolValue) ? folder : nil
+    }
+
+    /// Resolve a `.catalog` pointer to the executable payload inside its item
+    /// folder (for script and hook items).
+    static func resolveExecutable(at url: URL, root: URL) -> URL? {
+        resolveItemFolder(at: url, root: root).flatMap(executable(inItem:))
+    }
+
+    /// The executable payload in an item folder: the single executable regular
+    /// file (the non-executable `lanes-item.json` companion is excluded).
+    static func executable(inItem folder: URL) -> URL? {
+        guard let entries = try? fm.contentsOfDirectory(
+            at: folder, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]
+        ) else { return nil }
+        return entries.first { url in
+            url.lastPathComponent != itemManifestFilename
+                && ((try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false)
+                && fm.isExecutableFile(atPath: url.path)
+        }
+    }
+
+    /// Read an item folder's `lanes-item.json` companion (default name/icon +
+    /// description), or nil when absent.
+    static func itemMeta(at folder: URL) -> ItemMeta? {
+        JSONFile.read(ItemMeta.self, at: folder.appendingPathComponent(itemManifestFilename))
     }
 
     /// Read one catalog's descriptor.

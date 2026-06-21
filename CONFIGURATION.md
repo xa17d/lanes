@@ -228,31 +228,63 @@ The split is deliberate:
 A catalog repo **must** carry a `lanes-catalog.json` at its root declaring a human-facing name; a repo without one is rejected when you try to add it.
 That name is what Settings shows for the catalog (instead of the on-disk folder id).
 
+### Catalog layout
+
+Every catalog **item is a folder** containing its payload (an executable for a script/hook, the files to seed for a template) plus a `lanes-item.json` companion.
+Hooks add one more level — `<role>/<variant>/` — so a catalog can offer several implementations of the same hook.
+
 ```
-lanes-catalog.json        { "name": "My team's actions" }
-script/deploy.sh
-script/repository/open-pr.sh
-hook/update-lane-description
-template/CLAUDE.md
+lanes-catalog.json                       { "name": "My team's actions" }
+script/
+  deploy/
+    deploy.sh                            ← the executable payload
+    lanes-item.json                      ← the companion
+script/repository/
+  open-pr/
+    open-pr.sh
+    lanes-item.json
+hook/
+  update-lane-description/
+    git-status/        { describe.sh, lanes-item.json }
+    jira-summary/      { describe.sh, lanes-item.json }   ← a second variant
+  extract-ticket/
+    leading-key/       { extract.sh, lanes-item.json }
+template/
+  default/
+    CLAUDE.md                            ← everything except the companion is seeded
+    lanes-item.json
+```
+
+The payload is *everything in the item folder except `lanes-item.json`*: for a script/hook that's the one executable inside; for a template it's the files copied into a new lane.
+(`script/repository` is reserved, so a lane-script item can't be named `repository`.)
+
+The companion `lanes-item.json` gives the item a default name/icon and a description shown in the editor — all fields optional (the folder name and a scroll icon are the fallbacks):
+
+```json
+{
+  "name": "Open PR",
+  "icon": "arrow.triangle.pull",
+  "description": "Focus or open this branch's pull request in Chrome."
+}
 ```
 
 ### Pointing local config at a catalog item
 
-A `.catalog` file is JSON that locates a catalog item; its **own filename** supplies the display order/icon/name (exactly like a local script):
+A `.catalog` file is JSON that locates a catalog **item folder**; its **own filename** supplies the display order/icon/name (exactly like a local script), seeded from the companion when you add it via the editor:
 
-`.lanes/config/script/20---arrow.up---shared deploy.catalog`
+`.lanes/config/script/20---arrow.triangle.pull---Open PR.catalog`
 
 ```json
-{ "catalog": "github.com_my-org_lanes-catalog", "item": "script/deploy.sh" }
+{ "catalog": "github.com_my-org_lanes-catalog", "item": "script/open-pr" }
 ```
 
 - `catalog` — the catalog id (the `.lanes/catalog/<id>/` folder name).
-- `item` — the path of the target **inside the catalog repo**.
+- `item` — the item folder's path **inside the catalog repo**.
 
 The same mechanism works for singletons:
 
-- **Hooks** — `hook/extract-ticket.catalog` / `hook/update-lane-description.catalog`.
-- **Template** — `config/template.catalog` (with `"item": "template"`).
+- **Hooks** — `hook/extract-ticket.catalog` / `hook/update-lane-description.catalog` (with `"item": "hook/<role>/<variant>"`).
+- **Template** — `config/template.catalog` (with `"item": "template/<variant>"`).
 
 For these singletons the **pointer wins** when both a pointer and a local file exist — delete the pointer to fall back to your local version.
 For scripts, local files and pointers simply coexist.
