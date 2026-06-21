@@ -35,6 +35,18 @@ nonisolated struct TicketProvider: LaneProvider {
         return TicketEnv(key: link.key, url: url?.absoluteString ?? "")
     }
 
+    /// Link `key` to the lane unless it's already linked (idempotent upsert by
+    /// key, so re-running the `extract-ticket` hook never duplicates a ticket).
+    /// Returns true when a new link was added.
+    @discardableResult
+    static func link(key: String, urlOverride: URL? = nil, store: LaneStore) throws -> Bool {
+        var links = store.value([TicketLink].self, storeKey) ?? []
+        guard !links.contains(where: { $0.key == key }) else { return false }
+        links.append(TicketLink(id: UUID(), key: key, urlOverride: urlOverride))
+        try store.setValue(links, storeKey)
+        return true
+    }
+
     func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
         let links = store.value([TicketLink].self, Self.storeKey) ?? []
         let chrome = services.chrome
@@ -76,12 +88,8 @@ nonisolated struct TicketProvider: LaneProvider {
             guard let match = trimmed.firstMatch(of: /[A-Z][A-Z0-9]+-\d+/) else {
                 throw InputError(message: "Enter a ticket key like PROJ-123.")
             }
-            let key = String(match.output)
-            var override: URL?
-            if trimmed.lowercased().hasPrefix("http") { override = URL(string: trimmed) }
-            var links = store.value([TicketLink].self, storeKey) ?? []
-            links.append(TicketLink(id: UUID(), key: key, urlOverride: override))
-            try store.setValue(links, storeKey)
+            let override = trimmed.lowercased().hasPrefix("http") ? URL(string: trimmed) : nil
+            try link(key: String(match.output), urlOverride: override, store: store)
             return .pop
         }
     }

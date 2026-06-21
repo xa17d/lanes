@@ -14,12 +14,9 @@ nonisolated enum LaneActions {
         InputRequest(title: "New lane", placeholder: "Lane name") { name in
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { throw InputError(message: "Enter a lane name.") }
-            var lane = try LaneFS.create(name: trimmed, in: root)
-            // Seed the description from the update-lane-description hook, if any.
-            if let desc = hooks.description(for: lane, root: root) {
-                lane = (try? LaneFS.setSummary(lane, to: desc)) ?? lane
-            }
-            return .enter(lane)
+            let lane = try LaneFS.create(name: trimmed, in: root)
+            // Run the lifecycle hooks (extract-ticket, then update-lane-description).
+            return .enter(hooks.apply(to: lane, root: root))
         }
     }
 

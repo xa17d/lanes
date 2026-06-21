@@ -18,8 +18,9 @@ effect immediately — there's no settings file to edit and no restart needed.
         │   ├── deploy.sh        … a lane-level action
         │   └── repository/      … per-repository actions
         │       └── sync.sh
-        └── hooks/           ← lifecycle hooks
-            └── update-lane-description
+        └── hooks/           ← lifecycle hooks (run in a fixed order)
+            ├── extract-ticket          … 1. link a ticket from the folder name
+            └── update-lane-description … 2. set the description
 ```
 
 A lane is just a folder. Its identity, name, and archived state come from where
@@ -168,22 +169,53 @@ as the description.
 
 ## Hooks
 
-Executable scripts in `.lanes/config/hooks/` run at specific moments.
+Executable scripts in `.lanes/config/hooks/` run at specific moments. Both hooks
+below fire **when a lane is created** and **whenever you press ⌘R** (at the lane
+list this refreshes every listed lane; inside a lane, just the open one — folders
+adopted from outside the app catch up on the next ⌘R). Each runs with the **lane
+folder** as the working directory and the `LANE_DIR` / `LANE_NAME` / `LANE_ID`
+variables exported.
+
+When both are present they run in a **fixed order**, so a later hook can build on
+an earlier one:
+
+1. **`extract-ticket`** — links a ticket to the lane.
+2. **`update-lane-description`** — sets the description, and additionally gets
+   `TICKET_KEY` / `TICKET_URL` for the lane's primary ticket (so the description
+   can mention the ticket the first hook just linked).
+
+A hook that's missing, not executable, or prints nothing (after trimming) is a
+no-op and leaves the existing state untouched.
+
+### `extract-ticket`
+
+Its **stdout** (trimmed) is treated as a ticket key and linked to the lane — the
+same as typing it into **Link ticket…**. Linking is idempotent by key, so
+running on every ⌘R never creates duplicates, and manually linked tickets are
+left alone. The linked ticket shows in the lane's **Tickets** section and is
+exported to script-items as `$TICKET_KEY` / `$TICKET_URL`.
+
+This example links a leading issue key derived from the folder name — 2+
+uppercase letters, a dash, then digits (e.g. `ABC-1234-add-login` → `ABC-1234`):
+
+```sh
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$LANE_NAME" =~ ^[A-Z]{2,}-[0-9]+ ]]; then
+  printf '%s' "$BASH_REMATCH"
+fi
+```
+
+```sh
+chmod +x .lanes/config/hooks/extract-ticket
+```
 
 ### `update-lane-description`
 
-If this hook is executable, its **stdout** becomes the lane's description. It
-runs:
-
-- when a lane is **created**, and
-- whenever you press **⌘R** (refreshes every listed lane at the lane list, or
-  just the open lane). Folders adopted from outside the app pick up their
-  description on the next ⌘R.
-
-It runs with the **lane folder** as the working directory and the same
-`LANE_DIR` / `LANE_NAME` / `LANE_ID` variables as script-items. Trimmed, empty
-output leaves the existing description unchanged. Because the output *is* the
-description, it can include a `{{color:text}}` status badge.
+Its **stdout** becomes the lane's description. Because the output *is* the
+description, it can include a `{{color:text}}` status badge. As noted above, it
+also receives `$TICKET_KEY` / `$TICKET_URL` for the ticket `extract-ticket`
+linked.
 
 `.lanes/config/hooks/update-lane-description`:
 

@@ -32,6 +32,17 @@ Shown inside every lane, run with the lane folder as the working directory
 | ---- | ------ |
 | `20---Open in Finder---folder.sh` | Reveal the lane folder in Finder (replaces the former built-in). |
 
+## Lifecycle hooks — `hooks/`
+
+Run when a lane is created and on ⌘R, with the lane folder as the working
+directory. When both are present they fire in order — `extract-ticket` first,
+then `update-lane-description` (which then sees `$TICKET_KEY` / `$TICKET_URL`).
+See [../CONFIGURATION.md](../CONFIGURATION.md#hooks) for the full reference.
+
+| File | Hook |
+| ---- | ---- |
+| `extract-ticket` | Link a ticket whose key is the leading `ABC-1234`-style prefix of the folder name (2+ uppercase letters, dash, digits). Prints nothing — links nothing — when the name doesn't match. |
+
 ## Installing
 
 Copy the files you want into your configured lanes root and keep them
@@ -39,9 +50,11 @@ executable:
 
 ```sh
 ROOT=~/lanes   # your configured root
-mkdir -p "$ROOT/.lanes/config/script-items/repository"
+mkdir -p "$ROOT/.lanes/config/script-items/repository" "$ROOT/.lanes/config/hooks"
 cp examples/script-items/repository/*.sh "$ROOT/.lanes/config/script-items/repository/"
 cp examples/script-items/*.sh            "$ROOT/.lanes/config/script-items/"
+cp examples/hooks/*                      "$ROOT/.lanes/config/hooks/"
 chmod +x "$ROOT/.lanes/config/script-items/repository/"*.sh \
-         "$ROOT/.lanes/config/script-items/"*.sh
+         "$ROOT/.lanes/config/script-items/"*.sh \
+         "$ROOT/.lanes/config/hooks/"*
 ```

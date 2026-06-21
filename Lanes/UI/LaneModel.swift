@@ -134,7 +134,7 @@ final class LaneModel: ObservableObject {
         }
         // "New lane…" is always last.
         if let root = library.root {
-            let item = LaneActions.newLaneItem(root: root, hooks: LaneHooks(shell: services.shell))
+            let item = LaneActions.newLaneItem(root: root, hooks: LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL))
             rows.append(DisplayRow(item: item, pathLabels: []))
         }
         return rows
@@ -206,7 +206,7 @@ final class LaneModel: ObservableObject {
         }
         // Carry whatever was typed in the search field into the name field as
         // a starting suggestion.
-        pushInput(LaneActions.newLaneRequest(root: root, hooks: LaneHooks(shell: services.shell)), seed: query)
+        pushInput(LaneActions.newLaneRequest(root: root, hooks: LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL)), seed: query)
     }
 
     func pop() {
@@ -229,34 +229,32 @@ final class LaneModel: ObservableObject {
         }
     }
 
-    /// ⌘R: reload the current level *and* re-run the update-lane-description
-    /// hook so descriptions reflect their latest state.
+    /// ⌘R: reload the current level *and* re-run the lifecycle hooks
+    /// (extract-ticket → update-lane-description) so tickets and descriptions
+    /// reflect their latest state.
     func refresh() {
         reloadCurrent()
-        refreshDescriptions()
+        runLaneHooks()
     }
 
-    /// Re-run `update-lane-description` off the main thread, then fold the new
-    /// descriptions back in. In the lane list this refreshes every listed lane;
-    /// inside a lane it refreshes just that lane (updating the header).
-    private func refreshDescriptions() {
+    /// Re-run the lane hooks off the main thread, then fold their effects back
+    /// in. In the lane list this refreshes every listed lane; inside a lane it
+    /// refreshes just that lane (updating the header and reloading its items so
+    /// a freshly extracted ticket shows up).
+    private func runLaneHooks() {
         guard let root = library.root else { return }
-        let hooks = LaneHooks(shell: services.shell)
+        let hooks = LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL)
         if stack.isEmpty {
             let targets = lanes
             Task.detached {
-                for lane in targets {
-                    if let desc = hooks.description(for: lane, root: root) {
-                        _ = try? LaneFS.setSummary(lane, to: desc)
-                    }
-                }
+                for lane in targets { _ = hooks.apply(to: lane, root: root) }
                 await self.reloadLanes()
             }
         } else if let lane = currentLane {
             Task.detached {
-                guard let desc = hooks.description(for: lane, root: root),
-                      let updated = try? LaneFS.setSummary(lane, to: desc) else { return }
+                let updated = hooks.apply(to: lane, root: root)
                 await self.applyLaneUpdate(updated)
+                await self.reloadCurrent()
             }
         }
     }
