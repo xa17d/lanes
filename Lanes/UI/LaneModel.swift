@@ -27,6 +27,10 @@ final class LaneModel: ObservableObject {
     @Published var includeArchived = false
     @Published var panelAppeared = false
 
+    /// Lanes whose `{{refresh:…}}` hook is currently re-running, so frequent
+    /// re-renders don't spawn duplicate runs for the same lane.
+    private var refreshingLaneIDs: Set<Lane.ID> = []
+
     init(library: LaneLibrary, services: Services, registry: ProviderRegistry) {
         self.library = library
         self.services = services
@@ -57,12 +61,35 @@ final class LaneModel: ObservableObject {
         }
         if stack.isEmpty {
             reloadLanes()      // pick up external add / rename / delete
+        } else if let lane = currentLane {
+            kickStaleRefresh(lane)   // refresh the open lane's description if due
         }
         if !rows.indices.contains(selection) { selection = 0 }
     }
 
     func reloadLanes() {
         lanes = library.lanes(includeArchived: includeArchived)
+        for lane in lanes { kickStaleRefresh(lane) }
+    }
+
+    /// Lazily re-run a lane's `update-lane-description` hook when its description
+    /// declares a `{{refresh:…}}` interval that has elapsed. Cheap on the main
+    /// actor (a parse + set check); the hook runs off-main and the result folds
+    /// back into the list/header. The in-flight set guards against duplicate runs
+    /// while a slow hook is in progress.
+    private func kickStaleRefresh(_ lane: Lane) {
+        guard let root = library.root,
+              DescriptionMarkup.parse(from: lane.summary).refresh != nil,
+              !refreshingLaneIDs.contains(lane.id) else { return }
+        refreshingLaneIDs.insert(lane.id)
+        let hooks = LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL)
+        Task.detached {
+            let updated = hooks.refreshIfStale(lane, root: root)
+            await MainActor.run {
+                self.refreshingLaneIDs.remove(lane.id)
+                if let updated { self.applyLaneUpdate(updated) }
+            }
+        }
     }
 
     /// Toggle archived lanes in the level-0 list (so they can be unarchived).
@@ -109,7 +136,7 @@ final class LaneModel: ObservableObject {
                     // Match against the folder name and the description body +
                     // status text; keep the best score.
                     let nameScore = FuzzyMatcher.score(query: query, title: t.name)
-                    let descScore = FuzzyMatcher.score(query, StatusBadge.searchText(from: t.summary))
+                    let descScore = FuzzyMatcher.score(query, DescriptionMarkup.searchText(from: t.summary))
                     guard let best = [nameScore, descScore].compactMap({ $0 }).max() else { return nil }
                     return (t, best)
                 }
@@ -119,7 +146,7 @@ final class LaneModel: ObservableObject {
         var rows = matched.map { t -> DisplayRow in
             // Description big, folder name smaller below; the status badge (if
             // any) is parsed out of the description.
-            let parsed = StatusBadge.parse(from: t.summary)
+            let parsed = DescriptionMarkup.parse(from: t.summary)
             let hasBody = !parsed.body.isEmpty
             let title = hasBody ? parsed.body : t.name
             let subtitle: String?
@@ -349,6 +376,7 @@ final class LaneModel: ObservableObject {
         query = ""
         selection = 0
         loadLaneLevel(levelID: level.id)
+        kickStaleRefresh(touched)
     }
 
     private func push(item: any Item) {

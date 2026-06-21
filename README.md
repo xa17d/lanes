@@ -12,10 +12,11 @@ item exposes actions that **focus an existing window or launch a new one**.
   each showing its description large with the folder name beneath. `↵` opens a
   lane, `→` reveals its management menu (Rename / Archive / Delete…), `⌘N`
   creates one, `⌘⇧A` toggles archived lanes, `⌘R` refreshes descriptions. Search
-  matches both the name and the description. A description can embed a status
-  badge with `{{color:text}}` (e.g. `{{green:Ready to ship}}`). If
+  matches both the name and the description. A description can embed directives:
+  `{{badge:color:text}}` for a colored status badge and `{{refresh:30m}}` to
+  auto-refresh on a schedule. If
   `<root>/.lanes/config/hooks/update-lane-description` exists, its output is used
-  as a lane's description on creation and on ⌘R.
+  as a lane's description on creation, on ⌘R, and on its `{{refresh:…}}` interval.
 - **Inside a lane**, providers contribute actions:
   - **Tickets** — focus an open ticket tab or open it in Chrome; link new
     tickets (by key like `PROJ-123` or by pasting a URL). A base URL set in

@@ -37,11 +37,13 @@ Shown inside every lane, run with the lane folder as the working directory
 Run when a lane is created and on ⌘R, with the lane folder as the working
 directory. When both are present they fire in order — `extract-ticket` first,
 then `update-lane-description` (which then sees `$TICKET_KEY` / `$TICKET_URL`).
-See [../CONFIGURATION.md](../CONFIGURATION.md#hooks) for the full reference.
+`update-lane-description` also re-runs on its own `{{refresh:…}}` interval. See
+[../CONFIGURATION.md](../CONFIGURATION.md#hooks) for the full reference.
 
 | File | Hook |
 | ---- | ---- |
 | `extract-ticket` | Link a ticket whose key is the leading `ABC-1234`-style prefix of the folder name (2+ uppercase letters, dash, digits). Prints nothing — links nothing — when the name doesn't match. |
+| `update-lane-description` | Set the description to the lane's git working-tree status with a `{{badge:…}}` pill, and `{{refresh:10m}}` so it re-runs every 10 minutes when shown. |
 
 ## Installing
 

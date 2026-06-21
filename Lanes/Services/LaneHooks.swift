@@ -12,6 +12,10 @@
 //                                  primary ticket already exported, so the
 //                                  description can reference the extracted ticket.
 //
+//  A description may also declare `{{refresh:<duration>}}`; when it does, the
+//  UI re-runs update-lane-description (via `refreshIfStale`) once that interval
+//  has elapsed and the lane/list is shown again.
+//
 
 import Foundation
 
@@ -21,6 +25,11 @@ nonisolated struct LaneHooks: Sendable {
 
     static let ticketHook = "extract-ticket"
     static let descriptionHook = "update-lane-description"
+
+    /// Per-lane store key tracking the last `update-lane-description` run, used
+    /// by the `{{refresh:…}}` directive to decide when a description is stale.
+    static let refreshKey = "description-refresh"
+    nonisolated struct RefreshState: Codable, Sendable { var lastRunAt: Date }
 
     init(shell: Shell, baseURL: @escaping @Sendable () -> URL? = { nil }) {
         self.shell = shell
@@ -37,13 +46,35 @@ nonisolated struct LaneHooks: Sendable {
     func apply(to lane: Lane, root: URL) -> Lane {
         let store = LaneStore(lane: lane)
         extractTicket(for: lane, root: root, store: store)
-        if let desc = runDescription(for: lane, root: root, store: store) {
-            return (try? LaneFS.setSummary(lane, to: desc)) ?? lane
-        }
-        return lane
+        return applyDescription(to: lane, root: root, store: store) ?? lane
+    }
+
+    /// Re-run `update-lane-description` only if the lane's description declares a
+    /// `{{refresh:…}}` interval that has elapsed since the last run. Returns the
+    /// updated lane, or nil when nothing changed (no directive, not yet stale,
+    /// hook absent, or empty output). Meant to be called off the main actor.
+    func refreshIfStale(_ lane: Lane, root: URL, now: Date = Date()) -> Lane? {
+        guard let interval = DescriptionMarkup.parse(from: lane.summary).refresh,
+              hookExists(Self.descriptionHook, root: root) else { return nil }
+        let store = LaneStore(lane: lane)
+        if let last = store.value(RefreshState.self, Self.refreshKey)?.lastRunAt,
+           now.timeIntervalSince(last) < interval { return nil }
+        return applyDescription(to: lane, root: root, store: store)
     }
 
     // MARK: - Individual hooks
+
+    /// Run `update-lane-description`, record the run time (so the `{{refresh:…}}`
+    /// clock advances even on empty/failed output, preventing re-run storms), and
+    /// return the lane with the new description — or nil when the hook is absent
+    /// or produced nothing.
+    private func applyDescription(to lane: Lane, root: URL, store: LaneStore) -> Lane? {
+        guard hookExists(Self.descriptionHook, root: root) else { return nil }
+        let desc = runDescription(for: lane, root: root, store: store)
+        try? store.setValue(RefreshState(lastRunAt: Date()), Self.refreshKey)
+        guard let desc else { return nil }
+        return (try? LaneFS.setSummary(lane, to: desc)) ?? lane
+    }
 
     /// `extract-ticket`: treat its trimmed stdout as a ticket key and link it to
     /// the lane (idempotent — re-running never duplicates the ticket).
@@ -70,13 +101,19 @@ nonisolated struct LaneHooks: Sendable {
         ["LANE_DIR": lane.url.path, "LANE_NAME": lane.name, "LANE_ID": lane.id.uuidString]
     }
 
-    /// Run hook `name` (cwd = the lane dir) and return its trimmed stdout, or
-    /// nil when the hook is absent/not executable, fails, or prints nothing.
-    private func stdout(of name: String, for lane: Lane, root: URL, env: [String: String]) -> String? {
+    /// Whether hook `name` exists as an executable regular file.
+    private func hookExists(_ name: String, root: URL) -> Bool {
         let url = LaneFS.hooksDir(in: root).appendingPathComponent(name)
         let fm = FileManager.default
         let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-        guard isRegular, fm.isExecutableFile(atPath: url.path) else { return nil }
+        return isRegular && fm.isExecutableFile(atPath: url.path)
+    }
+
+    /// Run hook `name` (cwd = the lane dir) and return its trimmed stdout, or
+    /// nil when the hook is absent/not executable, fails, or prints nothing.
+    private func stdout(of name: String, for lane: Lane, root: URL, env: [String: String]) -> String? {
+        guard hookExists(name, root: root) else { return nil }
+        let url = LaneFS.hooksDir(in: root).appendingPathComponent(name)
         guard let out = try? shell.run(url.path, [], cwd: lane.url, env: env) else { return nil }
         let trimmed = out.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed

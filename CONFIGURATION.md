@@ -14,11 +14,11 @@ effect immediately — there's no settings file to edit and no restart needed.
     │   └── old-lane/
     └── config/              ← user configuration (everything below is optional)
         ├── template/        ← seeds the contents of every new lane
-        ├── script-items/    ← custom actions
-        │   ├── deploy.sh        … a lane-level action
-        │   └── repository/      … per-repository actions
-        │       └── sync.sh
-        └── hooks/           ← lifecycle hooks (run in a fixed order)
+        ├── script-items/    ← custom actions (named <order>---<name>---<icon>.<ext>)
+        │   ├── 10---deploy---bolt.fill.sh         … a lane-level action
+        │   └── repository/                        … per-repository actions
+        │       └── 10---fetch---arrow.clockwise.sh
+        └── hooks/           ← lifecycle hooks (fixed names, run in order)
             ├── extract-ticket          … 1. link a ticket from the folder name
             └── update-lane-description … 2. set the description
 ```
@@ -26,8 +26,7 @@ effect immediately — there's no settings file to edit and no restart needed.
 A lane is just a folder. Its identity, name, and archived state come from where
 the folder lives; the only persisted metadata is `.lane/lane.json` (a UUID,
 timestamps, and the optional description). Archived lanes live under
-`.lanes/archive/` (the `.lanes` parent already hides them, so the inner folder
-is plain `archive`, no dot).
+`.lanes/archive/`.
 
 ---
 
@@ -38,61 +37,53 @@ time it becomes a lane — both when you create one with `⌘N` and when Lanes
 adopts a folder you created outside the app (on the next scan). Existing files
 are never overwritten.
 
-Use it for files every lane should start with, e.g. a `.gitignore`, a `TODO.md`,
-or a `.envrc`.
+Use it for files every lane should start with, e.g. a lane-wide `CLAUDE.md`.
 
 ```
 .lanes/config/template/
-├── .gitignore
-├── TODO.md
+├── CLAUDE.md
 └── scratch/
-    └── .keep
+    └── …
 ```
 
 ---
 
 ## Custom actions (script-items)
 
-Make a file executable and drop it in `script-items/` to add a custom action to
-the launcher.
+Make a file executable and drop it under `.lanes/config/script-items/` to add a
+custom action to the launcher.
 
-- **`script-items/*`** — lane-level actions, shown in a **Scripts** section
-  inside every lane. Run with the **lane folder** as the working directory.
-- **`script-items/repository/*`** — per-repository actions, shown inside each
-  discovered repo (next to *Open PR*, *Open in VS Code*, …). Run once per repo
-  with that **repository's folder** as the working directory.
+- **`.lanes/config/script-items/*`** — lane-level actions, shown in a **Scripts**
+  section inside every lane. Run with the **lane folder** as the working
+  directory.
+- **`.lanes/config/script-items/repository/*`** — per-repository actions, shown
+  inside each discovered repo (next to *Open PR*, …). Run once per repo with that
+  **repository's folder** as the working directory.
 
 ### Rules
 
-- Only files with the **executable bit** are shown
-  (`chmod +x script-items/deploy.sh`). The file is executed directly, so its
-  **shebang** chooses the interpreter — bash, zsh, Python, Node, anything.
-- Dotfiles and `README*` are ignored.
-- The filename follows a fixed three-field format, separated by `---`:
+- Only files with the **executable bit** are shown (`chmod +x <file>`). The file
+  is executed directly, so its **shebang** picks the interpreter (bash, Python,
+  Node, …). Dotfiles and `README*` are ignored.
+- The filename follows a three-field format separated by `---`:
 
   ```
   <order>---<name>---<icon>.<ext>
   ```
 
-  - **`order`** is a sort key (e.g. `10`, `20`) — it's stripped from the
-    displayed name and only controls the order actions appear in.
-  - **`name`** is shown **verbatim** — ordinary dashes and spaces are kept, no
-    transformation. (`deploy to prod` stays *deploy to prod*.)
-  - **`icon`** is an [SF Symbol](https://developer.apple.com/sf-symbols/) name
-    (e.g. `bolt.fill`) used as the action's icon. An invalid name falls back to
-    the default scroll glyph.
+  - **`order`** — sort key (e.g. `10`); stripped from the display.
+  - **`name`** — shown **verbatim** (dashes/spaces kept).
+  - **`icon`** — an [SF Symbol](https://developer.apple.com/sf-symbols/) name
+    (e.g. `bolt.fill`); an invalid name falls back to the scroll glyph.
 
   So `10---deploy to prod---bolt.fill.sh` shows as **deploy to prod** with the
-  `bolt.fill` icon, ordered by `10`. A file that doesn't use the format (no
-  `---`) just shows its whole base name with the scroll icon.
+  `bolt.fill` icon. A file not matching the format shows its whole base name with
+  the scroll icon.
 
-  > The file extension is removed before parsing, so always include one
-  > (`.sh`, `.py`, …) when your icon name contains dots — otherwise the icon's
-  > last `.segment` is mistaken for the extension. A script with no extension can
-  > still use a single-word icon (`hammer`).
-- Scripts run **silently**. On success the panel just closes; on a **non-zero
-  exit** the script's stderr is shown as an error toast. (Use a script that
-  opens a terminal/app itself if you want to watch long-running output.)
+  > Always include an extension (`.sh`, `.py`, …) when the icon name has dots, or
+  > the icon's last `.segment` is taken as the extension.
+- Scripts run **silently**: on success the panel closes; a **non-zero exit**
+  surfaces the script's stderr as an error toast.
 
 ### Environment
 
@@ -140,30 +131,39 @@ chmod +x ".lanes/config/script-items/repository/10---fetch---arrow.triangle.2.ci
 
 ---
 
-## Lane descriptions and status badges
+## Lane descriptions and directives
 
 Each lane can carry a one-line description, stored in `lane.json`. In the lane
 list it's shown **large**, with the folder name smaller beneath it; the search
-field matches the description as well as the folder name.
+field matches the description as well as the folder name. Set or edit it from
+inside a lane (**Manage lane… → Set description…**) or generate it from the
+`update-lane-description` hook (see below).
 
-Set or edit it from inside a lane: **Manage lane… → Set description…**.
+A description may embed `{{name:args}}` **directives**. The first of each kind
+wins, and every directive is stripped from the displayed (and searched) text.
 
-### Status badge
+### `{{badge:color:text}}` — status badge
 
-A description may embed a status badge using the syntax `{{color:text}}`. The
-first marker becomes a colored pill on the lane row, and every marker is
-stripped from the displayed (and searched) description text.
+Renders as a colored pill on the lane row and in the in-lane header.
 
 ```
-{{green:Ready to ship}} Implements the new auth flow
+{{badge:green:Ready to ship}} Implements the new auth flow
 ```
 
-renders as a green **Ready to ship** badge with *Implements the new auth flow*
-as the description.
+shows a green **Ready to ship** badge with *Implements the new auth flow* as the
+description.
 
 - **Colors:** `gray`, `blue`, `green`, `yellow`, `orange`, `red`, `purple`,
   `pink`. An unrecognized color falls back to gray.
-- An empty label (`{{green:}}`) renders as a bare colored dot.
+- Empty text (`{{badge:green:}}` or `{{badge:green}}`) renders as a bare dot.
+
+### `{{refresh:duration}}` — auto-refresh
+
+Marks how often the `update-lane-description` hook should re-run. When a lane (in
+the list or open) is shown and that long has passed since the last run, Lanes
+re-runs the hook in the background and updates the description. `duration` is
+`30s` / `30m` / `2h` / `1d` (bare number = seconds). No-op without the hook; see
+[Hooks](#hooks).
 
 ---
 
@@ -172,9 +172,10 @@ as the description.
 Executable scripts in `.lanes/config/hooks/` run at specific moments. Both hooks
 below fire **when a lane is created** and **whenever you press ⌘R** (at the lane
 list this refreshes every listed lane; inside a lane, just the open one — folders
-adopted from outside the app catch up on the next ⌘R). Each runs with the **lane
-folder** as the working directory and the `LANE_DIR` / `LANE_NAME` / `LANE_ID`
-variables exported.
+adopted from outside the app catch up on the next ⌘R). `update-lane-description`
+also re-runs on its own when its description sets a [`{{refresh:…}}`](#refreshduration--auto-refresh)
+interval. Each runs with the **lane folder** as the working directory and the
+`LANE_DIR` / `LANE_NAME` / `LANE_ID` variables exported.
 
 When both are present they run in a **fixed order**, so a later hook can build on
 an earlier one:
@@ -212,10 +213,10 @@ chmod +x .lanes/config/hooks/extract-ticket
 
 ### `update-lane-description`
 
-Its **stdout** becomes the lane's description. Because the output *is* the
-description, it can include a `{{color:text}}` status badge. As noted above, it
-also receives `$TICKET_KEY` / `$TICKET_URL` for the ticket `extract-ticket`
-linked.
+Its **stdout** becomes the lane's description, so it can include any
+[directive](#lane-descriptions-and-directives) — a `{{badge:…}}` pill and/or a
+`{{refresh:…}}` interval to keep itself up to date. It also receives
+`$TICKET_KEY` / `$TICKET_URL` for the ticket `extract-ticket` linked.
 
 `.lanes/config/hooks/update-lane-description`:
 
@@ -225,9 +226,9 @@ set -euo pipefail
 cd "$LANE_DIR"
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "no-git")
 if git diff --quiet 2>/dev/null; then
-  echo "{{green:clean}} on $branch"
+  echo "{{refresh:10m}} {{badge:green:clean}} on $branch"
 else
-  echo "{{orange:uncommitted changes}} on $branch"
+  echo "{{refresh:10m}} {{badge:orange:uncommitted changes}} on $branch"
 fi
 ```
 

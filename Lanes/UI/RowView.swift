@@ -89,7 +89,7 @@ struct RowView: View {
     }
 }
 
-/// A colored status pill parsed from a lane's `{{color:text}}` description
+/// A colored status pill parsed from a lane's `{{badge:color:text}}` description
 /// marker. An empty label renders as a bare colored dot.
 ///
 /// Contrast: the badge sits on a translucent vibrancy backdrop (the desktop

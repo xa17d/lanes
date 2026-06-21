@@ -71,7 +71,7 @@ nonisolated enum LaneActions {
                                icon: .note,
                                run: {
                                    .pushInput(InputRequest(title: "Lane description",
-                                                           placeholder: "Description — add {{green:status}} for a badge",
+                                                           placeholder: "Description — add {{badge:green:status}} for a badge",
                                                            initialText: lane.summary ?? "") { text in
                                        // Re-enter the lane so the new description
                                        // shows immediately in the header.

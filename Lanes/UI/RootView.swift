@@ -57,10 +57,10 @@ struct RootView: View {
     }
 
     /// The active lane's one-line description, shown under the breadcrumb so
-    /// you can tell at a glance which lane you're in. A `{{color:text}}` status
-    /// marker is rendered as a colored badge rather than shown raw.
+    /// you can tell at a glance which lane you're in. A `{{badge:color:text}}`
+    /// directive is rendered as a colored badge rather than shown raw.
     @ViewBuilder private var laneSummary: some View {
-        let parsed = StatusBadge.parse(from: model.currentLane?.summary)
+        let parsed = DescriptionMarkup.parse(from: model.currentLane?.summary)
         if parsed.badge != nil || !parsed.body.isEmpty {
             HStack(spacing: Tokens.Space.s) {
                 if !parsed.body.isEmpty {
