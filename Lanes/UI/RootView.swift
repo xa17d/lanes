@@ -92,9 +92,9 @@ struct RootView: View {
             return "↵ confirm · esc cancel"
         }
         if model.stack.isEmpty {
-            let base = "↑↓ navigate · ↵ open · ⌘N new · ⌘⇧A archived · esc close"
-            return model.includeArchived ? base + " (shown)" : base
+            let archived = model.includeArchived ? "⌘⇧A archived (shown)" : "⌘⇧A archived"
+            return "↑↓ navigate · ↵ open · ⌘N new · \(archived) · ⌘R refresh · ⌘, settings · esc close"
         }
-        return "↑↓ navigate · ↵ open · → drill in · esc back · ⌘W close"
+        return "↑↓ navigate · ↵ open · → drill in · ← back · ⌘R refresh · ⌘, settings · ⌘W close"
     }
 }
