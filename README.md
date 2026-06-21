@@ -51,15 +51,37 @@ contents of every newly created (or externally adopted) lane.
 
 ## Build & run
 
-```sh
-xcodebuild -project Lanes.xcodeproj -scheme Lanes -configuration Debug build
-```
-
 Requires Xcode 26 / Swift 6, macOS 15+. The single SPM dependency
 ([KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts))
-resolves on first build. The app is unsandboxed (it runs `git` and drives Chrome
-/ iTerm via Apple Events); the first such action triggers the macOS Automation
-prompt.
+resolves automatically on first build.
 
-On first launch, choose a **root folder** in Settings (⌘,). For development you
-can set `LANES_ROOT=/path/to/lanes` to skip the picker.
+**From Xcode (simplest):** open `Lanes.xcodeproj` and press **⌘R** to build and
+run.
+
+**From the command line:**
+
+```sh
+# Build
+xcodebuild -project Lanes.xcodeproj -scheme Lanes -configuration Debug \
+  -derivedDataPath ./.build build
+
+# Launch the built app
+open ./.build/Build/Products/Debug/Lanes.app
+```
+
+Lanes is a menu-bar accessory app: launching it adds a **menu-bar icon** and
+registers the **⌥Space** hotkey — there is **no Dock icon and no window on
+launch**. Press ⌥Space to open the launcher panel.
+
+On first launch, choose a **root folder** in Settings (⌘, from the menu-bar
+icon) — this is the directory whose subfolders become your lanes. For
+development you can set `LANES_ROOT=/path/to/lanes` to skip the picker, and
+`LANES_AUTOSHOW=1` to show the panel immediately:
+
+```sh
+LANES_ROOT=/path/to/lanes \
+  ./.build/Build/Products/Debug/Lanes.app/Contents/MacOS/Lanes
+```
+
+The app is unsandboxed (it runs `git` and drives Chrome / iTerm via Apple
+Events); the first such action triggers the macOS Automation permission prompt.
