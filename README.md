@@ -52,7 +52,7 @@ contents of every newly created (or externally adopted) lane.
 ## Build & run
 
 ```sh
-xcodebuild -project lane.xcodeproj -scheme lane -configuration Debug build
+xcodebuild -project Lanes.xcodeproj -scheme Lanes -configuration Debug build
 ```
 
 Requires Xcode 26 / Swift 6, macOS 15+. The single SPM dependency
@@ -62,4 +62,4 @@ resolves on first build. The app is unsandboxed (it runs `git` and drives Chrome
 prompt.
 
 On first launch, choose a **root folder** in Settings (⌘,). For development you
-can set `LANE_ROOT=/path/to/lanes` to skip the picker.
+can set `LANES_ROOT=/path/to/lanes` to skip the picker.
