@@ -29,8 +29,7 @@ final class StatusItemController: NSObject {
         super.init()
 
         if let button = statusItem.button {
-            if let image = NSImage(systemSymbolName: "road.lanes", accessibilityDescription: "Lanes") {
-                image.isTemplate = true
+            if let image = menuBarIcon(keepAwake: false) {
                 button.image = image
             } else {
                 button.title = "Lanes"   // fallback if the symbol is unavailable
@@ -49,11 +48,34 @@ final class StatusItemController: NSObject {
         statusItem.menu = menu
     }
 
-    /// Reflect keep-awake state: check the menu item and tint the menu-bar icon
-    /// yellow while sleep is being held off.
+    /// Reflect keep-awake state: check the menu item and add a small bolt badge
+    /// to the menu-bar icon while sleep is being held off.
     func setKeepAwake(_ active: Bool) {
         keepAwakeItem?.state = active ? .on : .off
-        statusItem.button?.contentTintColor = active ? .systemYellow : nil
+        if let image = menuBarIcon(keepAwake: active) { statusItem.button?.image = image }
+    }
+
+    /// The menu-bar icon, optionally with a small `bolt.fill` composited into the
+    /// bottom-right corner. Returned as a single **template** image so the menu
+    /// bar adapts its color (monochrome, no fixed tint).
+    private func menuBarIcon(keepAwake: Bool) -> NSImage? {
+        guard let base = NSImage(systemSymbolName: "road.lanes", accessibilityDescription: "Lanes") else {
+            return nil
+        }
+        guard keepAwake,
+              let bolt = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Keeping awake") else {
+            base.isTemplate = true
+            return base
+        }
+        let size = base.size
+        let composite = NSImage(size: size)
+        composite.lockFocus()
+        base.draw(in: NSRect(origin: .zero, size: size))
+        let badge = size.height * 0.6
+        bolt.draw(in: NSRect(x: size.width - badge, y: 0, width: badge, height: badge))
+        composite.unlockFocus()
+        composite.isTemplate = true
+        return composite
     }
 
     /// Show or hide a small orange dot over the menu-bar icon to signal that a
