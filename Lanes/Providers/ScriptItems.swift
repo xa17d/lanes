@@ -150,6 +150,9 @@ nonisolated struct ScriptItems: Sendable {
             title: parsed.title,
             icon: parsed.icon,
             keywords: ["script", "run", script.display.lastPathComponent],
+            // Order by the local `<order>---…` filename so the editor's ordering
+            // is honored instead of falling back to alphabetical title sort.
+            sortValue: script.display.lastPathComponent,
             run: {
                 // Silent: exec the file directly so its shebang chooses the
                 // interpreter; a nonzero exit throws ShellError (stderr → toast).

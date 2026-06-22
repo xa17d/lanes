@@ -56,6 +56,7 @@ nonisolated enum ConfigEdits {
         var icon: String
         var name: String
         let pointer: Catalogs.Pointer?
+        let detail: String?
         var isLocal: Bool { pointer == nil }
         var id: String { url.path }
     }
@@ -132,15 +133,19 @@ nonisolated enum ConfigEdits {
     }
 
     /// The enabled, ordered items in `dir`: catalog pointers + local scripts
-    /// merged and sorted by order, ready to drag-reorder.
-    static func activeItems(in dir: URL) -> [ActiveItem] {
-        var out = pointers(in: dir).map {
-            ActiveItem(url: $0.url, order: $0.order, icon: $0.icon, name: $0.name, pointer: $0.pointer)
+    /// merged and sorted by order, ready to drag-reorder. Catalog items carry
+    /// their companion description (resolved against `root`).
+    static func activeItems(in dir: URL, root: URL) -> [ActiveItem] {
+        var out = pointers(in: dir).map { entry -> ActiveItem in
+            let detail = Catalogs.resolveItemFolder(at: entry.url, root: root)
+                .flatMap { Catalogs.itemMeta(at: $0)?.description }
+            return ActiveItem(url: entry.url, order: entry.order, icon: entry.icon,
+                              name: entry.name, pointer: entry.pointer, detail: detail)
         }
         for local in localItems(in: dir) {
             let parsed = parseFilename(local.url)
             out.append(ActiveItem(url: local.url, order: parsed.order, icon: parsed.icon,
-                                  name: parsed.name, pointer: nil))
+                                  name: parsed.name, pointer: nil, detail: nil))
         }
         return out.sorted { lhs, rhs in
             if lhs.order != rhs.order { return lhs.order < rhs.order }
@@ -154,7 +159,8 @@ nonisolated enum ConfigEdits {
     /// every existing active item (catalog pointers + local scripts).
     static func addPointer(in dir: URL, catalog: String, item: String,
                            name: String, icon: String) throws {
-        let order = (activeItems(in: dir).map(\.order).max() ?? 0) + 10
+        let orders = pointers(in: dir).map(\.order) + localItems(in: dir).map { parseFilename($0.url).order }
+        let order = (orders.max() ?? 0) + 10
         let filename = makeFilename(order: order, icon: icon, name: name, ext: Catalogs.pointerExtension)
         try writePointer(Catalogs.Pointer(catalog: catalog, item: item),
                          to: dir.appendingPathComponent(filename))

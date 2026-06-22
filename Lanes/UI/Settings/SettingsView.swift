@@ -44,7 +44,7 @@ struct SettingsView: View {
             detail(pane ?? .general)
                 .navigationTitle((pane ?? .general).rawValue)
         }
-        .frame(minWidth: 720, idealWidth: 760, minHeight: 480, idealHeight: 560)
+        .frame(minWidth: 720, idealWidth: 760, minHeight: 480, idealHeight: 660)
     }
 
     @ViewBuilder

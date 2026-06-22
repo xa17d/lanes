@@ -482,7 +482,7 @@ final class LaneModel: ObservableObject {
     /// Merge provider results into the (section, title)-sorted top level.
     private static func merge(_ results: [ProviderResult]) -> [any Item] {
         results.sorted { $0.section < $1.section }
-            .flatMap { $0.items.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending } }
+            .flatMap { $0.items.sorted { $0.sortKey.localizedStandardCompare($1.sortKey) == .orderedAscending } }
     }
 
     // MARK: - Level mutation helpers

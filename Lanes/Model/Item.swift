@@ -28,6 +28,10 @@ protocol Item: Identifiable, Sendable {
     /// rank *below* genuine content matches when searching, even if their
     /// title scores higher for the query.
     nonisolated var isSecondary: Bool { get }
+    /// Key used to order sibling items within a section (numeric-aware). Defaults
+    /// to the title; script items set it to their `<order>---…` filename so the
+    /// user's explicit ordering wins over alphabetical.
+    nonisolated var sortKey: String { get }
     nonisolated var run: (@Sendable () async throws -> RunOutcome)? { get }
     nonisolated func children() async -> [any Item]
 }
@@ -37,6 +41,7 @@ extension Item {
     var icon: IconToken { .generic }
     var keywords: [String] { [] }
     var isSecondary: Bool { false }
+    var sortKey: String { title }
     var run: (@Sendable () async throws -> RunOutcome)? { nil }
     func children() async -> [any Item] { [] }
 }
@@ -49,8 +54,11 @@ nonisolated struct BasicItem: Item {
     var icon: IconToken = .generic
     var keywords: [String] = []
     var isSecondary: Bool = false
+    /// Explicit sort key; falls back to `title` when nil.
+    var sortValue: String? = nil
     var run: (@Sendable () async throws -> RunOutcome)? = nil
     var childrenProvider: @Sendable () async -> [any Item] = { [] }
 
+    var sortKey: String { sortValue ?? title }
     func children() async -> [any Item] { await childrenProvider() }
 }

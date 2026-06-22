@@ -174,70 +174,89 @@ struct ItemsTab: View {
             if active.wrappedValue.isEmpty && inactive.isEmpty {
                 Text("No catalog items or local scripts yet.").font(.caption).foregroundStyle(.secondary)
             }
-            ForEach(active.wrappedValue) { item in activeRow(item, dir: dir) }
-                .onMove { from, to in
-                    var list = active.wrappedValue
-                    list.move(fromOffsets: from, toOffset: to)
-                    ConfigEdits.applyOrder(list)
-                    reload()
-                }
+            ForEach(active.wrappedValue) { item in
+                activeRow(item, dir: dir)
+                    .listRowBackground(Color.secondary.opacity(0.08))
+            }
+            .onMove { from, to in
+                active.wrappedValue.move(fromOffsets: from, toOffset: to)
+                ConfigEdits.applyOrder(active.wrappedValue)
+                reload()
+            }
             ForEach(inactive) { item in availableRow(item, dir: dir) }
         }
     }
 
-    private func activeRow(_ item: ConfigEdits.ActiveItem, dir: URL) -> some View {
-        HStack(spacing: 8) {
-            if item.isLocal {
-                Image(systemName: validSymbol(item.icon)).frame(width: 16).foregroundStyle(.secondary)
-                Text(item.name)
-                Text("local").font(.caption2).foregroundStyle(.tertiary)
-                Spacer()
-                Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
-                    .buttonStyle(.borderless).font(.caption)
-            } else {
-                Toggle("", isOn: Binding(get: { true }, set: { on in
-                    if !on, let p = item.pointer {
-                        ConfigEdits.removePointer(catalog: p.catalog, item: p.item, in: dir)
-                        reload()
-                    }
-                }))
-                .labelsHidden().toggleStyle(.checkbox)
-                Image(systemName: validSymbol(item.icon)).frame(width: 16).foregroundStyle(.secondary)
-                Text(item.name)
-                if let p = item.pointer {
-                    Text(model.name(for: p.catalog)).font(.caption2).foregroundStyle(.tertiary)
+    /// Shared row layout so active and inactive items look identical — same icon,
+    /// name, description and source — differing only by the leading checkbox and
+    /// a faint background on active rows.
+    private func itemRow<L: View, T: View>(
+        icon: String, name: String, detail: String?, source: String?,
+        @ViewBuilder leading: () -> L, @ViewBuilder trailing: () -> T) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            leading().frame(width: 18)
+            Image(systemName: validSymbol(icon)).frame(width: 18).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(name)
+                if let detail, !detail.isEmpty {
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
                 }
-                Spacer()
-                Button { editing = item } label: { Image(systemName: "pencil") }.buttonStyle(.borderless)
+                if let source, !source.isEmpty {
+                    Text(source).font(.caption2).foregroundStyle(.tertiary)
+                }
             }
+            Spacer()
+            trailing()
         }
+    }
+
+    private func activeRow(_ item: ConfigEdits.ActiveItem, dir: URL) -> some View {
+        itemRow(icon: item.icon, name: item.name, detail: item.detail,
+                source: item.isLocal ? "local" : item.pointer.map { model.name(for: $0.catalog) },
+                leading: {
+                    if item.isLocal {
+                        Color.clear
+                    } else {
+                        Toggle("", isOn: Binding(get: { true }, set: { on in
+                            if !on, let p = item.pointer {
+                                ConfigEdits.removePointer(catalog: p.catalog, item: p.item, in: dir)
+                                reload()
+                            }
+                        }))
+                        .labelsHidden().toggleStyle(.checkbox)
+                    }
+                },
+                trailing: {
+                    if item.isLocal {
+                        Button("Reveal") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
+                            .buttonStyle(.borderless).font(.caption)
+                    } else {
+                        Button { editing = item } label: { Image(systemName: "pencil") }
+                            .buttonStyle(.borderless)
+                    }
+                })
     }
 
     private func availableRow(_ item: ConfigEdits.Available, dir: URL) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Toggle("", isOn: Binding(get: { false }, set: { on in
-                if on {
-                    try? ConfigEdits.addPointer(in: dir, catalog: item.catalog, item: item.item,
-                                                name: item.name, icon: item.icon)
-                    reload()
-                }
-            }))
-            .labelsHidden().toggleStyle(.checkbox)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.name)
-                if let detail = item.detail {
-                    Text(detail).font(.caption).foregroundStyle(.secondary)
-                }
-                Text(model.name(for: item.catalog)).font(.caption2).foregroundStyle(.tertiary)
-            }
-            Spacer()
-        }
+        itemRow(icon: item.icon, name: item.name, detail: item.detail,
+                source: model.name(for: item.catalog),
+                leading: {
+                    Toggle("", isOn: Binding(get: { false }, set: { on in
+                        if on {
+                            try? ConfigEdits.addPointer(in: dir, catalog: item.catalog, item: item.item,
+                                                        name: item.name, icon: item.icon)
+                            reload()
+                        }
+                    }))
+                    .labelsHidden().toggleStyle(.checkbox)
+                },
+                trailing: { EmptyView() })
     }
 
     private func reload() {
-        laneActive = ConfigEdits.activeItems(in: laneDir)
+        laneActive = ConfigEdits.activeItems(in: laneDir, root: root)
         laneAvailable = ConfigEdits.available(root: root, subdir: "script")
-        repoActive = ConfigEdits.activeItems(in: repoDir)
+        repoActive = ConfigEdits.activeItems(in: repoDir, root: root)
         repoAvailable = ConfigEdits.available(root: root, subdir: "script/repository")
     }
 }
