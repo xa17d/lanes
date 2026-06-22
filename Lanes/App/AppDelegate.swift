@@ -47,6 +47,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] available in self?.statusItem?.setUpdatesAvailable(available) }
             .store(in: &cancellables)
 
+        // New users: auto-subscribe to the default catalog (+ a starter set) the
+        // first time a root is configured. Skipped under the LANES_ROOT dev
+        // override so test runs don't clone over the network.
+        if rootOverride == nil {
+            core.library.$root
+                .sink { [weak self] root in
+                    guard let self, let root else { return }
+                    CatalogsModel.seedDefaultIfNeeded(root: root) { [weak self] in
+                        self?.core.model.reloadCurrent()
+                    }
+                }
+                .store(in: &cancellables)
+        }
+
         // Catalogs fetch in the background (a stale one ~daily) so updates surface
         // as a menu-bar dot; applying them stays an explicit action in Settings.
         refreshCatalogs()

@@ -201,6 +201,32 @@ nonisolated enum ConfigEdits {
         }
     }
 
+    /// Enable one catalog item (writing a pointer seeded from its companion), but
+    /// only if it actually exists in the checkout — so a renamed/removed item is
+    /// silently skipped.
+    static func enable(catalog id: String, item: String, in dir: URL, root: URL) {
+        let folder = LaneFS.catalogCheckout(id: id, in: root).appendingPathComponent(item)
+        guard fm.fileExists(atPath: folder.path) else { return }
+        let meta = Catalogs.itemMeta(at: folder)
+        let name = meta?.name?.trimmedNonEmpty ?? (item as NSString).lastPathComponent
+        try? addPointer(in: dir, catalog: id, item: item,
+                        name: name, icon: meta?.icon?.trimmedNonEmpty ?? defaultIcon)
+    }
+
+    /// Enable a small curated starter set from the default catalog, so the
+    /// launcher is useful immediately after auto-subscribing.
+    static func enableStarterSet(catalog id: String, root: URL) {
+        let lane = LaneFS.scriptDir(in: root)
+        let repo = LaneFS.repoScriptDir(in: root)
+        for item in ["script/open-terminal", "script/claude"] {
+            enable(catalog: id, item: item, in: lane, root: root)
+        }
+        for item in ["script/repository/open-pr", "script/repository/open-terminal",
+                     "script/repository/copy-branch", "script/repository/open-repo-in-browser"] {
+            enable(catalog: id, item: item, in: repo, root: root)
+        }
+    }
+
     // MARK: Hooks & template bindings
 
     /// The pointer bound to hook `name`, if any.
@@ -316,6 +342,53 @@ final class CatalogsModel: ObservableObject {
 
     func add(url: String, ref: String) {
         run { root in try Catalogs.add(url: url, ref: ref, root: root, shell: self.shell) }
+    }
+
+    /// Subscribe to the official default catalog and enable a starter set (the
+    /// empty-state "Add default catalog" button).
+    func addDefault() {
+        run { root in
+            try Catalogs.add(url: Catalogs.defaultURL, ref: "", root: root, shell: self.shell)
+            if let id = Catalogs.id(forURL: Catalogs.defaultURL) {
+                ConfigEdits.enableStarterSet(catalog: id, root: root)
+            }
+        }
+    }
+
+    /// UserDefaults key: roots we've already auto-subscribed the default catalog
+    /// for (so removing it isn't undone on the next launch).
+    private static let seededRootsKey = "defaultCatalogSeededRoots"
+
+    /// On the first sighting of `root`, silently subscribe to the default catalog
+    /// and enable a starter set. Gated so it runs once per root; a clone failure
+    /// (e.g. offline) leaves it unseeded to retry next launch. `onChange` runs on
+    /// the main actor after a successful seed.
+    @MainActor
+    static func seedDefaultIfNeeded(root: URL, onChange: @escaping @MainActor () -> Void) {
+        let defaults = UserDefaults.standard
+        var seeded = Set(defaults.stringArray(forKey: seededRootsKey) ?? [])
+        guard !seeded.contains(root.path), let id = Catalogs.id(forURL: Catalogs.defaultURL) else { return }
+        // Already present (e.g. added manually) → mark seeded, don't duplicate.
+        if Catalogs.config(id: id, root: root) != nil {
+            seeded.insert(root.path)
+            defaults.set(Array(seeded), forKey: seededRootsKey)
+            return
+        }
+        Task.detached {
+            do {
+                try Catalogs.add(url: Catalogs.defaultURL, ref: "", root: root, shell: Shell())
+                ConfigEdits.enableStarterSet(catalog: id, root: root)
+            } catch {
+                return   // leave unseeded so it retries next launch
+            }
+            await MainActor.run {
+                let store = UserDefaults.standard
+                var s = Set(store.stringArray(forKey: Self.seededRootsKey) ?? [])
+                s.insert(root.path)
+                store.set(Array(s), forKey: Self.seededRootsKey)
+                onChange()
+            }
+        }
     }
 
     func syncAll() {

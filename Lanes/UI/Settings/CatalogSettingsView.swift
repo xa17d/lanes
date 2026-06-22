@@ -24,6 +24,8 @@ struct CatalogsSection: View {
                 Text("Subscribe to a git repo of shared scripts, hooks, and templates.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Button("Add the default catalog (recommended)") { model.addDefault() }
+                    .disabled(model.busy)
             }
             ForEach(model.catalogs) { catalog in
                 CatalogRow(catalog: catalog,

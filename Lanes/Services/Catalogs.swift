@@ -43,6 +43,9 @@ nonisolated enum Catalogs {
     /// Extension of a pointer file that references a catalog item.
     static let pointerExtension = "catalog"
 
+    /// The official default catalog new users are auto-subscribed to.
+    static let defaultURL = "https://github.com/xa17d/lanes-catalog-default.git"
+
     private static let gitPath = "/usr/bin/git"
     private static var fm: FileManager { .default }
 
