@@ -308,8 +308,8 @@ struct HooksTab: View {
                     }
                 }
                 RadioRow(selected: selection.wrappedValue == nil,
-                         title: "None — use the local \(name) hook, if any",
-                         detail: nil) {
+                         title: "Local",
+                         detail: "Uses the local \(name) hook, if any.") {
                     selection.wrappedValue = nil
                     try? ConfigEdits.clearHookPointer(name, root: root)
                 }
@@ -336,7 +336,8 @@ struct HooksTab: View {
                     }
                 }
                 RadioRow(selected: template == nil,
-                         title: "None — use the local template/ folder, if any", detail: nil) {
+                         title: "Local",
+                         detail: "Uses the local template/ folder, if any.") {
                     template = nil
                     try? ConfigEdits.clearTemplatePointer(root: root)
                 }
