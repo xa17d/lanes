@@ -56,7 +56,7 @@ Make a file executable and drop it under `.lanes/config/script/` to add a custom
 
 - **`.lanes/config/script/*`** — lane-level actions, shown in a **Scripts** section inside every lane.
   Run with the **lane folder** as the working directory.
-- **`.lanes/config/script/repository/*`** — per-repository actions, shown inside each discovered repo (these are the *only* per-repo actions — Open PR, Open Terminal here, and the editor/CI launchers all ship as examples here).
+- **`.lanes/config/script/repository/*`** — per-repository actions, shown inside each discovered repo (these are the *only* per-repo actions — Open PR, Open Terminal here, and the editor/CI launchers all ship in the [default catalog](https://github.com/xa17d/lanes-catalog-default)).
   Run once per repo with that **repository's folder** as the working directory.
 
 Alongside your own scripts you can drop a **`.catalog` pointer** here that references a script in a [catalog](#catalogs) — see below.

@@ -15,11 +15,11 @@ Each lane is a folder; inside it live repos and linked tickets, and every item e
   - **Tickets** — focus an open ticket tab or open it in Chrome; link new tickets (by key like `PROJ-123` or by pasting a URL).
     A base URL set in Settings turns keys into links.
   - **Repositories** — one entry per discovered repo (subtitle = current branch); its actions are the per-repo scripts.
-    Open PR (host-aware), Open Terminal here, and the editor/Finder/CI launchers (Fork, Android Studio, VS Code, Finder, GitHub Actions) all ship as ready-to-use example scripts in [`examples/`](examples/) rather than built-ins.
-  - **Agents & terminal** — Open Terminal here, Claude, and opencode (each a tagged iTerm session at the lane root) ship as example lane-level scripts in [`examples/`](examples/).
+    Open PR (host-aware), Open Terminal here, and the editor/Finder/CI launchers (Fork, Android Studio, VS Code, Finder, GitHub Actions) all ship in the [default catalog](https://github.com/xa17d/lanes-catalog-default) (subscribe to it in Settings) rather than as built-ins.
+  - **Agents & terminal** — Open Terminal here, Claude, and opencode (each a tagged iTerm session at the lane root) also ship in the [default catalog](https://github.com/xa17d/lanes-catalog-default).
   - **Scripts** — drop an executable file in `<root>/.lanes/config/script/` to add a custom lane action (run with the lane dir as cwd); files under `script/repository/` become per-repo actions (run in the repo dir).
     Scripts run silently with `LANE_DIR`/`LANE_NAME`/`LANE_ID`, `TICKET_KEY`/`TICKET_URL` for the lane's primary linked ticket (and `REPO_DIR`/`REPO_NAME` for repo scripts) in the environment; stderr from a failing script is shown as a toast.
-    See [`examples/`](examples/) for drop-in scripts.
+    Subscribe to a **catalog** (e.g. the [default catalog](https://github.com/xa17d/lanes-catalog-default)) in Settings to get ready-to-use scripts.
 - **Search** is fuzzy and subtree-wide: typing filters the current level, and a non-empty query surfaces nested actions with their breadcrumb (`service-api › Open PR`).
 
 ## Configuration
