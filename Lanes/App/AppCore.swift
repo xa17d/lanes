@@ -13,7 +13,9 @@ final class AppCore {
     static let shared = AppCore()
 
     let library = LaneLibrary()
-    lazy var model = LaneModel(library: library, services: Self.makeServices(), registry: .default)
+    let keepAwake = KeepAwake()
+    lazy var model = LaneModel(library: library, services: Self.makeServices(),
+                               registry: .default, keepAwake: keepAwake)
     lazy var panel = PanelController(model: model)
     lazy var settings = SettingsWindowController(library: library)
 

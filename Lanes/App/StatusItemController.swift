@@ -12,14 +12,18 @@ final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
     private let onToggle: () -> Void
     private let onSettings: () -> Void
+    private let onToggleKeepAwake: () -> Void
     private let onQuit: () -> Void
     private var updateBadge: NSView?
+    private var keepAwakeItem: NSMenuItem?
 
     init(onToggle: @escaping () -> Void,
          onSettings: @escaping () -> Void,
+         onToggleKeepAwake: @escaping () -> Void,
          onQuit: @escaping () -> Void) {
         self.onToggle = onToggle
         self.onSettings = onSettings
+        self.onToggleKeepAwake = onToggleKeepAwake
         self.onQuit = onQuit
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -36,10 +40,20 @@ final class StatusItemController: NSObject {
         let menu = NSMenu()
         menu.addItem(menuItem("Open Lanes", #selector(toggle), key: ""))
         menu.addItem(.separator())
+        let keepAwake = menuItem("Keep system awake", #selector(toggleKeepAwake), key: "")
+        menu.addItem(keepAwake)
+        keepAwakeItem = keepAwake
         menu.addItem(menuItem("Settings…", #selector(settings), key: ","))
         menu.addItem(.separator())
         menu.addItem(menuItem("Quit Lanes", #selector(quit), key: "q"))
         statusItem.menu = menu
+    }
+
+    /// Reflect keep-awake state: check the menu item and tint the menu-bar icon
+    /// yellow while sleep is being held off.
+    func setKeepAwake(_ active: Bool) {
+        keepAwakeItem?.state = active ? .on : .off
+        statusItem.button?.contentTintColor = active ? .systemYellow : nil
     }
 
     /// Show or hide a small orange dot over the menu-bar icon to signal that a
@@ -72,5 +86,6 @@ final class StatusItemController: NSObject {
 
     @objc private func toggle() { onToggle() }
     @objc private func settings() { onSettings() }
+    @objc private func toggleKeepAwake() { onToggleKeepAwake() }
     @objc private func quit() { onQuit() }
 }

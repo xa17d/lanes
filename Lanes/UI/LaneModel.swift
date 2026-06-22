@@ -15,6 +15,8 @@ final class LaneModel: ObservableObject {
     let library: LaneLibrary
     let services: Services
     let registry: ProviderRegistry
+    let keepAwake: KeepAwake
+    private var cancellables = Set<AnyCancellable>()
     var onClose: () -> Void = {}
     var onOpenSettings: () -> Void = {}
     /// Open Settings focused on the Catalogs pane (from the lane-list update banner).
@@ -39,10 +41,15 @@ final class LaneModel: ObservableObject {
     /// re-renders don't spawn duplicate runs for the same lane.
     private var refreshingLaneIDs: Set<Lane.ID> = []
 
-    init(library: LaneLibrary, services: Services, registry: ProviderRegistry) {
+    init(library: LaneLibrary, services: Services, registry: ProviderRegistry, keepAwake: KeepAwake) {
         self.library = library
         self.services = services
         self.registry = registry
+        self.keepAwake = keepAwake
+        // Re-render when keep-awake toggles so the launcher row reflects it.
+        keepAwake.objectWillChange
+            .sink { [weak self] in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     // MARK: - Lifecycle
@@ -178,11 +185,13 @@ final class LaneModel: ObservableObject {
                               icon: .folder, pathLabels: [], badge: parsed.badge,
                               payload: .lane(t))
         }
-        // "New lane…" is always last.
+        // "New lane…" then the global "Keep awake" toggle are always last.
         if let root = library.root {
             let item = LaneActions.newLaneItem(root: root, hooks: LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL))
             rows.append(DisplayRow(item: item, pathLabels: []))
         }
+        let keepAwakeItem = LaneActions.keepAwakeItem(isActive: keepAwake.isActive, keepAwake: keepAwake)
+        rows.append(DisplayRow(item: keepAwakeItem, pathLabels: []))
         return rows
     }
 

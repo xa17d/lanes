@@ -6,12 +6,14 @@
 //
 
 import AppKit
+import Combine
 import KeyboardShortcuts
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
     private let core = AppCore.shared
     private var catalogTimer: Timer?
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Accessory app: no Dock icon, lives in the menu bar.
@@ -29,8 +31,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = StatusItemController(
             onToggle: { [weak self] in self?.core.panel.toggle(); self?.updateCatalogBadge() },
             onSettings: { AppDelegate.openSettings() },
+            onToggleKeepAwake: { [weak self] in self?.core.keepAwake.toggle() },
             onQuit: { NSApp.terminate(nil) }
         )
+
+        // Reflect keep-awake state in the menu bar (checkbox + icon tint). Fires
+        // immediately with the current value, so it also sets the initial state.
+        core.keepAwake.$isActive
+            .sink { [weak self] active in self?.statusItem?.setKeepAwake(active) }
+            .store(in: &cancellables)
 
         // Catalogs fetch in the background (a stale one ~daily) so updates surface
         // as a menu-bar dot; applying them stays an explicit action in Settings.

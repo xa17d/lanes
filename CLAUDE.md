@@ -123,6 +123,7 @@ Four layers, nothing below couples to anything above:
   Each owns its entire subtree.
   `ItemLoader` runs them concurrently in a `TaskGroup` with a per-provider 3s timeout, streaming results that `LaneModel` merges by `(section, title)`.
 - **Services** (`Services/`) — every side effect (Shell, GitInspector, Host adapters, Chrome/iTerm AppleScript controllers, AppLauncher), injected into providers.
+  `KeepAwake` (also in `Services/`, so `LaneModel`/`LaneActions` stay harness-compilable) is a `@MainActor ObservableObject` wrapping a `ProcessInfo` activity (`.idleSystemSleepDisabled`) that prevents idle *system* sleep while active (display may still sleep); owned by `AppCore`, off at launch, toggled from the menu bar ("Keep system awake", which checks the item + tints the icon) and a "Keep awake" row at the bottom of the lane list. `LaneModel` observes it so the launcher row updates live.
 
 `LaneModel` (`UI/LaneModel.swift`) is the navigation brain: a `stack` of levels (level 0 = lane list is implicit/empty stack), `query`, `selection`.
 `PanelController` installs a local `NSEvent` key monitor and routes keys into the model (so the search field keeps text input while ↑↓↵→← drive navigation).
