@@ -342,6 +342,9 @@ final class CatalogsModel: ObservableObject {
                 self.busy = false
                 if let failure { self.errorMessage = failure }
                 self.reload()
+                // Update availability changed (applied/added/removed/synced) — keep
+                // the menu-bar dot + lane-list banner in sync.
+                AppCore.shared.model.refreshCatalogIndicator()
             }
         }
     }

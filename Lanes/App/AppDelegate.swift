@@ -29,16 +29,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         core.model.onOpenCatalogSettings = { AppDelegate.openSettings(pane: .catalogs) }
 
         statusItem = StatusItemController(
-            onToggle: { [weak self] in self?.core.panel.toggle(); self?.updateCatalogBadge() },
+            onToggle: { [weak self] in self?.core.panel.toggle() },
             onSettings: { AppDelegate.openSettings() },
             onToggleKeepAwake: { [weak self] in self?.core.keepAwake.toggle() },
             onQuit: { NSApp.terminate(nil) }
         )
 
-        // Reflect keep-awake state in the menu bar (checkbox + icon tint). Fires
+        // Reflect keep-awake state in the menu bar (checkbox + icon badge). Fires
         // immediately with the current value, so it also sets the initial state.
         core.keepAwake.$isActive
             .sink { [weak self] active in self?.statusItem?.setKeepAwake(active) }
+            .store(in: &cancellables)
+
+        // The menu-bar update dot mirrors the model's catalog flag (the single
+        // source of truth), so it clears as soon as an update is applied/removed.
+        core.model.$catalogUpdatesAvailable
+            .sink { [weak self] available in self?.statusItem?.setUpdatesAvailable(available) }
             .store(in: &cancellables)
 
         // Catalogs fetch in the background (a stale one ~daily) so updates surface
@@ -70,18 +76,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppCore.shared.settings.show(pane: pane)
     }
 
-    /// Fetch stale catalogs off-main, then refresh the menu-bar update dot.
+    /// Fetch stale catalogs off-main, then recompute the model's update flag
+    /// (which the menu-bar dot + lane-list banner observe).
     private func refreshCatalogs() {
-        guard let root = core.library.root else { updateCatalogBadge(); return }
+        guard let root = core.library.root else { core.model.refreshCatalogIndicator(); return }
         Task.detached {
             Catalogs.fetchAllIfStale(root: root, shell: Shell())
-            await MainActor.run { self.updateCatalogBadge() }
+            await MainActor.run { self.core.model.refreshCatalogIndicator() }
         }
-    }
-
-    private func updateCatalogBadge() {
-        let available = core.library.root.map { Catalogs.anyUpdatesAvailable(root: $0) } ?? false
-        statusItem?.setUpdatesAvailable(available)
-        core.model.catalogUpdatesAvailable = available
     }
 }
