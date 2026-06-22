@@ -26,6 +26,10 @@ final class SettingsWindowController {
             window.title = "Lanes Settings"
             window.styleMask = [.titled, .closable, .resizable]
             window.contentMinSize = NSSize(width: 720, height: 480)
+            // Set the initial size explicitly: NavigationSplitView reports a
+            // flexible fitting size, so the SwiftUI idealHeight alone doesn't
+            // determine the opening height.
+            window.setContentSize(NSSize(width: 760, height: 710))
             window.isReleasedWhenClosed = false
             window.center()
             self.window = window
