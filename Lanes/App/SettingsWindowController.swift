@@ -13,15 +13,18 @@ import SwiftUI
 @MainActor
 final class SettingsWindowController {
     private let library: LaneLibrary
+    private let nav = SettingsNavigation()
     private var window: NSWindow?
 
     init(library: LaneLibrary) {
         self.library = library
     }
 
-    func show() {
+    /// Show the Settings window, optionally jumping to `pane`.
+    func show(pane: SettingsPane? = nil) {
+        if let pane { nav.pane = pane }
         if window == nil {
-            let hosting = NSHostingController(rootView: SettingsView(library: library))
+            let hosting = NSHostingController(rootView: SettingsView(library: library, nav: nav))
             let window = NSWindow(contentViewController: hosting)
             window.title = "Lanes Settings"
             window.styleMask = [.titled, .closable, .resizable]

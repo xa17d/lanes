@@ -20,6 +20,7 @@ struct RootView: View {
             Divider().opacity(0.4)
             Breadcrumb(labels: model.breadcrumb)
             laneSummary
+            catalogUpdateBanner
             LevelView(model: model)
             Footer(hint: hint)
         }
@@ -84,6 +85,34 @@ struct RootView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, Tokens.Space.l)
             .padding(.bottom, Tokens.Space.s)
+        }
+    }
+
+    /// At the lane list, a tappable banner when a subscribed catalog has an
+    /// update waiting — opens Settings on the Catalogs pane.
+    @ViewBuilder private var catalogUpdateBanner: some View {
+        if model.stack.isEmpty && model.catalogUpdatesAvailable {
+            Button { model.onOpenCatalogSettings() } label: {
+                HStack(spacing: Tokens.Space.s) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Catalog updates available")
+                        .font(Tokens.Font.subtitle)
+                    Spacer(minLength: Tokens.Space.s)
+                    Text("Review")
+                        .font(Tokens.Font.subtitle)
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, Tokens.Space.l)
+                .padding(.vertical, Tokens.Space.s)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(Color.orange.opacity(0.10))
         }
     }
 

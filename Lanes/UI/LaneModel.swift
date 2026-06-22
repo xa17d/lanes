@@ -17,8 +17,13 @@ final class LaneModel: ObservableObject {
     let registry: ProviderRegistry
     var onClose: () -> Void = {}
     var onOpenSettings: () -> Void = {}
+    /// Open Settings focused on the Catalogs pane (from the lane-list update banner).
+    var onOpenCatalogSettings: () -> Void = {}
 
     @Published var lanes: [Lane] = []
+    /// True when a subscribed catalog has a fetched update not yet applied —
+    /// surfaced as a banner in the lane list.
+    @Published var catalogUpdatesAvailable = false
     @Published var stack: [LevelState] = []
     @Published var query: String = "" { didSet { selection = 0 } }
     @Published var inputText: String = ""
@@ -73,6 +78,17 @@ final class LaneModel: ObservableObject {
     func reloadLanes() {
         lanes = library.lanes(includeArchived: includeArchived)
         for lane in lanes { kickStaleRefresh(lane) }
+        refreshCatalogIndicator()
+    }
+
+    /// Recompute whether any subscribed catalog has an update waiting (a cheap
+    /// disk check, done off-main). Drives the lane-list update banner.
+    func refreshCatalogIndicator() {
+        guard let root = library.root else { catalogUpdatesAvailable = false; return }
+        Task.detached {
+            let available = Catalogs.anyUpdatesAvailable(root: root)
+            await MainActor.run { self.catalogUpdatesAvailable = available }
+        }
     }
 
     /// Lazily re-run a lane's `update-lane-description` hook when its description

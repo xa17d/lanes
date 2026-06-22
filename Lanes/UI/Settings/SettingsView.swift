@@ -7,48 +7,57 @@
 
 import SwiftUI
 import AppKit
+import Combine
 import KeyboardShortcuts
+
+/// The Settings sidebar panes.
+enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
+    case general = "General", catalogs = "Catalogs", items = "Items", hooks = "Hooks"
+    var id: Self { self }
+    var symbol: String {
+        switch self {
+        case .general: return "gearshape"
+        case .catalogs: return "shippingbox"
+        case .items: return "list.bullet"
+        case .hooks: return "bolt.badge.clock"
+        }
+    }
+}
+
+/// Shared selection so an opener (e.g. the lane-list update banner) can jump the
+/// reused Settings window to a specific pane.
+@MainActor
+final class SettingsNavigation: ObservableObject {
+    @Published var pane: SettingsPane? = .general
+}
 
 struct SettingsView: View {
     @ObservedObject var library: LaneLibrary
+    @ObservedObject var nav: SettingsNavigation
     @StateObject private var catalogs: CatalogsModel
     @AppStorage(SettingsKeys.ticketBaseURL) private var ticketBaseURL = ""
 
-    init(library: LaneLibrary) {
+    init(library: LaneLibrary, nav: SettingsNavigation) {
         _library = ObservedObject(wrappedValue: library)
+        _nav = ObservedObject(wrappedValue: nav)
         _catalogs = StateObject(wrappedValue: CatalogsModel(library: library))
     }
 
-    private enum Pane: String, CaseIterable, Identifiable, Hashable {
-        case general = "General", catalogs = "Catalogs", items = "Items", hooks = "Hooks"
-        var id: Self { self }
-        var symbol: String {
-            switch self {
-            case .general: return "gearshape"
-            case .catalogs: return "shippingbox"
-            case .items: return "list.bullet"
-            case .hooks: return "bolt.badge.clock"
-            }
-        }
-    }
-
-    @State private var pane: Pane? = .general
-
     var body: some View {
         NavigationSplitView {
-            List(Pane.allCases, selection: $pane) { pane in
+            List(SettingsPane.allCases, selection: $nav.pane) { pane in
                 Label(pane.rawValue, systemImage: pane.symbol).tag(pane)
             }
             .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 210)
         } detail: {
-            detail(pane ?? .general)
-                .navigationTitle((pane ?? .general).rawValue)
+            detail(nav.pane ?? .general)
+                .navigationTitle((nav.pane ?? .general).rawValue)
         }
         .frame(minWidth: 720, idealWidth: 760, minHeight: 480, idealHeight: 660)
     }
 
     @ViewBuilder
-    private func detail(_ pane: Pane) -> some View {
+    private func detail(_ pane: SettingsPane) -> some View {
         switch pane {
         case .general:
             generalTab

@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             core.library.setRoot(URL(fileURLWithPath: rootOverride, isDirectory: true))
         }
         core.model.onOpenSettings = { AppDelegate.openSettings() }
+        core.model.onOpenCatalogSettings = { AppDelegate.openSettings(pane: .catalogs) }
 
         statusItem = StatusItemController(
             onToggle: { [weak self] in self?.core.panel.toggle(); self?.updateCatalogBadge() },
@@ -56,8 +57,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    static func openSettings() {
-        AppCore.shared.settings.show()
+    static func openSettings(pane: SettingsPane? = nil) {
+        AppCore.shared.settings.show(pane: pane)
     }
 
     /// Fetch stale catalogs off-main, then refresh the menu-bar update dot.
@@ -72,5 +73,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateCatalogBadge() {
         let available = core.library.root.map { Catalogs.anyUpdatesAvailable(root: $0) } ?? false
         statusItem?.setUpdatesAvailable(available)
+        core.model.catalogUpdatesAvailable = available
     }
 }

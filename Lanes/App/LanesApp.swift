@@ -13,7 +13,7 @@ struct LanesApp: App {
 
     var body: some Scene {
         Settings {
-            SettingsView(library: AppCore.shared.library)
+            SettingsView(library: AppCore.shared.library, nav: SettingsNavigation())
         }
     }
 }
