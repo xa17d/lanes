@@ -71,8 +71,13 @@ final class StatusItemController: NSObject {
         let composite = NSImage(size: size)
         composite.lockFocus()
         base.draw(in: NSRect(origin: .zero, size: size))
-        let badge = size.height * 0.6
-        bolt.draw(in: NSRect(x: size.width - badge, y: 0, width: badge, height: badge))
+        // A large bolt centered over the glyph, aspect-preserved.
+        let targetH = size.height * 0.9
+        let scale = targetH / bolt.size.height
+        let badge = NSSize(width: bolt.size.width * scale, height: targetH)
+        bolt.draw(in: NSRect(x: (size.width - badge.width) / 2,
+                             y: (size.height - badge.height) / 2,
+                             width: badge.width, height: badge.height))
         composite.unlockFocus()
         composite.isTemplate = true
         return composite
