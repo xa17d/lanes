@@ -20,6 +20,7 @@ struct RootView: View {
             Divider().opacity(0.4)
             Breadcrumb(labels: model.breadcrumb)
             laneSummary
+            keepAwakeBanner
             catalogUpdateBanner
             LevelView(model: model)
             Footer(hint: hint)
@@ -88,6 +89,33 @@ struct RootView: View {
         }
     }
 
+    /// While keep-awake is active, an informational banner with a quick "Turn
+    /// Off". Shown at any depth (it reflects a global state). ⌘K also toggles it.
+    @ViewBuilder private var keepAwakeBanner: some View {
+        if model.keepAwakeActive {
+            HStack(spacing: Tokens.Space.s) {
+                Image(systemName: "bolt.fill")
+                    .foregroundStyle(.yellow)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Keeping your Mac awake")
+                        .font(Tokens.Font.subtitle)
+                    Text("System sleep is paused while agents run · ⌘K to toggle")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: Tokens.Space.s)
+                Button("Turn Off") { model.toggleKeepAwake() }
+                    .buttonStyle(.plain)
+                    .font(Tokens.Font.subtitle)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, Tokens.Space.l)
+            .padding(.vertical, Tokens.Space.s)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.yellow.opacity(0.10))
+        }
+    }
+
     /// At the lane list, a tappable banner when a subscribed catalog has an
     /// update waiting — opens Settings on the Catalogs pane.
     @ViewBuilder private var catalogUpdateBanner: some View {
@@ -128,8 +156,8 @@ struct RootView: View {
         }
         if model.stack.isEmpty {
             let archived = model.includeArchived ? "⌘⇧A archived (shown)" : "⌘⇧A archived"
-            return "↑↓ navigate · ↵ open · ⌘N new · \(archived) · ⌘R refresh · esc close"
+            return "↑↓ navigate · ↵ open · ⌘N new · \(archived) · ⌘R refresh · ⌘K awake · esc close"
         }
-        return "↑↓ navigate · ↵ open · ⌘R refresh · esc back · ⌘W close"
+        return "↑↓ navigate · ↵ open · ⌘R refresh · ⌘K awake · esc back · ⌘W close"
     }
 }

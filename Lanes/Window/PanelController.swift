@@ -93,6 +93,7 @@ final class PanelController {
             case ",": model.onOpenSettings(); return true
             case "n" where model.stack.isEmpty: model.newLane(); return true
             case "A" where model.stack.isEmpty: model.toggleArchived(); return true
+            case "k": model.toggleKeepAwake(); return true   // keep the Mac awake
             default: return false
             }
         }

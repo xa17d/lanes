@@ -26,22 +26,6 @@ nonisolated enum LaneActions {
                   run: { .pushInput(newLaneRequest(root: root, hooks: hooks)) })
     }
 
-    /// Global "keep the Mac awake" toggle, shown at the bottom of the lane list.
-    /// `isActive` is read by the caller (main actor) for display; the run closure
-    /// toggles the shared `KeepAwake`. Stays open so the row updates in place.
-    static func keepAwakeItem(isActive: Bool, keepAwake: KeepAwake) -> any Item {
-        BasicItem(
-            id: "keep-awake",
-            title: isActive ? "Keep awake: On" : "Keep awake: Off",
-            subtitle: isActive ? "Preventing system sleep — select to turn off"
-                               : "Prevent system sleep while agents work",
-            icon: .custom(isActive ? "bolt.fill" : "bolt"),
-            keywords: ["keep awake", "caffeinate", "caffeine", "sleep", "insomnia", "prevent sleep"],
-            isSecondary: true,
-            run: { await keepAwake.toggle(); return .stay }
-        )
-    }
-
     /// The library root that owns `lane`, derived from its location: the parent
     /// folder for an active lane, or three levels up for an archived lane (which
     /// lives at `<root>/.lanes/archive/<lane>`).

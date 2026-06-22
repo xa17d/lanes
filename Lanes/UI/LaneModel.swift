@@ -185,15 +185,21 @@ final class LaneModel: ObservableObject {
                               icon: .folder, pathLabels: [], badge: parsed.badge,
                               payload: .lane(t))
         }
-        // "New lane…" then the global "Keep awake" toggle are always last.
+        // "New lane…" is always last.
         if let root = library.root {
             let item = LaneActions.newLaneItem(root: root, hooks: LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL))
             rows.append(DisplayRow(item: item, pathLabels: []))
         }
-        let keepAwakeItem = LaneActions.keepAwakeItem(isActive: keepAwake.isActive, keepAwake: keepAwake)
-        rows.append(DisplayRow(item: keepAwakeItem, pathLabels: []))
         return rows
     }
+
+    // MARK: - Keep awake
+
+    var keepAwakeActive: Bool { keepAwake.isActive }
+
+    /// Toggle the system keep-awake (bound to ⌘K while the panel is open and the
+    /// banner's "Turn Off" button).
+    func toggleKeepAwake() { keepAwake.toggle() }
 
     private func itemRows(for level: LevelState) -> [DisplayRow] {
         if query.isEmpty {
