@@ -1,0 +1,43 @@
+Lanes — Proprietary License
+Copyright © 2026 Daniel Gehrer. All rights reserved.
+
+This software and its accompanying files (the "Software"), including the
+example configuration under `examples/`, are the proprietary property of
+Daniel Gehrer. This is NOT open-source software.
+
+1. Grant of License.
+   Subject to the terms below, you are granted a worldwide, royalty-free,
+   non-exclusive, NON-TRANSFERABLE, and REVOCABLE license to download,
+   install, and use the Software for personal and internal business
+   purposes.
+
+2. Restrictions.
+   You may NOT, without the prior written permission of the copyright
+   holder:
+     (a) redistribute, publish, sublicense, sell, rent, lease, or
+         otherwise make the Software available to any third party;
+     (b) create or distribute derivative works based on the Software;
+     (c) remove or alter this license or any copyright notice.
+
+3. Revocation and Termination.
+   This license is granted at the sole discretion of the copyright holder
+   and MAY BE REVOKED OR TERMINATED AT ANY TIME, with or without cause,
+   and with or without notice. Upon revocation or termination you must
+   cease all use of the Software and destroy all copies in your
+   possession. The copyright holder may also stop distributing the
+   Software at any time.
+
+4. Reservation of Rights.
+   All rights not expressly granted herein are reserved by the copyright
+   holder. The copyright holder retains the right to relicense, sell, or
+   otherwise distribute the Software, or any future version of it, under
+   any terms.
+
+5. No Warranty.
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+   IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES,
+   OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+   OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR
+   THE USE OR OTHER DEALINGS IN THE SOFTWARE.

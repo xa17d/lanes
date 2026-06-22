@@ -64,3 +64,10 @@ LANES_ROOT=/path/to/lanes \
 ```
 
 The app is unsandboxed (it runs `git` and drives Chrome / iTerm via Apple Events); the first such action triggers the macOS Automation permission prompt.
+
+## License
+
+Copyright © 2026 Daniel Gehrer. All rights reserved.
+Lanes is **proprietary, source-available software — not open source.**
+You may use it for personal and internal business purposes under a revocable license; redistribution, derivative works, and resale are not permitted.
+See [LICENSE](LICENSE) for the full terms.
