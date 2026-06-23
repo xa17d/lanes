@@ -53,7 +53,7 @@ struct RootView: View {
                 .textFieldStyle(.plain)
                 .font(Tokens.Font.search)
                 .focused($searchFocused)
-            if model.isRefreshing {
+            if model.isRefreshing || model.isRunningAction {
                 ProgressView()
                     .controlSize(.small)
                     .transition(.opacity)
@@ -62,6 +62,7 @@ struct RootView: View {
         .padding(.horizontal, Tokens.Space.l)
         .frame(height: Tokens.Size.searchHeight)
         .animation(.easeInOut(duration: 0.15), value: model.isRefreshing)
+        .animation(.easeInOut(duration: 0.15), value: model.isRunningAction)
     }
 
     /// The active lane's one-line description, shown under the breadcrumb so

@@ -36,6 +36,9 @@ final class LaneModel: ObservableObject {
     /// True while an explicit ⌘R refresh (hooks + reload) is running, so the UI
     /// can show a spinner. Not set by the passive {{refresh:…}} auto-refresh.
     @Published var isRefreshing = false
+    /// True while a selected item's action is executing (e.g. a script), so the
+    /// panel shows a spinner instead of looking frozen.
+    @Published private(set) var isRunningAction = false
 
     /// Lanes whose `{{refresh:…}}` hook is currently re-running, so frequent
     /// re-renders don't spawn duplicate runs for the same lane.
@@ -331,11 +334,16 @@ final class LaneModel: ObservableObject {
 
     private func activate(item: any Item) {
         if let run = item.run {
+            guard !isRunningAction else { return }   // ignore re-entry while one runs
             // For "New lane…", seed the name field with the current query so
             // a search that found nothing becomes the new lane's name.
             let seed = item.id == "lane:new" ? query : nil
+            isRunningAction = true
             Task {
-                do { honor(try await run(), seed: seed) }
+                defer { isRunningAction = false }
+                // Run off the main actor so a slow script (Shell.run blocks until
+                // exit) doesn't freeze the panel and the spinner can animate.
+                do { honor(try await Task.detached(priority: .userInitiated) { try await run() }.value, seed: seed) }
                 catch { showToast(error.localizedDescription, kind: .error) }
             }
         } else {
@@ -344,10 +352,12 @@ final class LaneModel: ObservableObject {
     }
 
     private func submitInput() {
-        guard let request = currentInputRequest else { return }
+        guard let request = currentInputRequest, !isRunningAction else { return }
         let text = inputText
+        isRunningAction = true
         Task {
-            do { honor(try await request.onSubmit(text)) }
+            defer { isRunningAction = false }
+            do { honor(try await Task.detached(priority: .userInitiated) { try await request.onSubmit(text) }.value) }
             catch { showToast(error.localizedDescription, kind: .error) }
         }
     }

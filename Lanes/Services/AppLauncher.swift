@@ -26,6 +26,10 @@ nonisolated struct AppLauncher: Sendable {
     }
 
     func reveal(_ path: URL) {
-        NSWorkspace.shared.activateFileViewerSelecting([path])
+        // Run closures now execute off the main actor, but AppKit wants this on
+        // main.
+        DispatchQueue.main.async {
+            NSWorkspace.shared.activateFileViewerSelecting([path])
+        }
     }
 }
