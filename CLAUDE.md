@@ -3,7 +3,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Lanes is a keyboard-first macOS launcher for switching between parallel work "lanes".
-See `README.md` for the user-facing feature set, and `CONFIGURATION.md` for the user-facing reference on the `<root>/.lanes/` config surface (templates, scripts, descriptions/status badges, hooks, catalogs) — keep that doc in sync when changing any of those behaviors.
+See `README.md` for the user-facing feature set, and `doc/CONFIGURATION.md` for the user-facing reference on the `<root>/.lanes/` config surface (templates, scripts, descriptions/status badges, hooks, catalogs) — keep that doc in sync when changing any of those behaviors.
 
 Note: the app/product is named **Lanes** (`PRODUCT_NAME = Lanes`), so the built bundle is `Lanes.app` and the binary is `Lanes`.
 The Xcode target, scheme, project file (`Lanes.xcodeproj`) and source folder (`Lanes/`) all use the name `Lanes`, and the bundle id is `at.xa1.lanes`.

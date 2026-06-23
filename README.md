@@ -1,32 +1,19 @@
 # Lanes
 
 A keyboard-first macOS launcher for switching between parallel work **lanes**.
-Each lane is a folder; inside it live repos and linked tickets, and every item exposes actions that **focus an existing window or launch a new one**.
+Each lane is just a folder — Lanes turns it into a hub for its repos, tickets, and quick actions, all an **⌥Space** away.
+
+![The Lanes launcher](doc/screenshot-lanes.png)
 
 ## What it does
 
-- **⌥Space** toggles a floating launcher panel (menu-bar accessory app, no Dock icon).
-- **Level 0** lists your lanes (every visible folder under the configured root), each showing its description large with the folder name beneath.
-  `↵` opens a lane, `→` reveals its management menu (Rename / Archive / Delete…), `⌘N` creates one, `⌘⇧A` toggles archived lanes, `⌘R` refreshes descriptions.
-  Search matches both the name and the description.
-  A description can embed directives: `{{badge:color:text}}` for a colored status badge and `{{refresh:30m}}` to auto-refresh on a schedule.
-  If `<root>/.lanes/config/hook/update-lane-description` exists, its output is used as a lane's description on creation, on ⌘R, and on its `{{refresh:…}}` interval.
-- **Inside a lane**, providers contribute actions:
-  - **Tickets** — focus an open ticket tab or open it in Chrome; link new tickets (by key like `PROJ-123` or by pasting a URL).
-    A base URL set in Settings turns keys into links.
-  - **Repositories** — one entry per discovered repo (subtitle = current branch); its actions are the per-repo scripts.
-    Open PR (host-aware), Open Terminal here, and the editor/Finder/CI launchers (Fork, Android Studio, VS Code, Finder, GitHub Actions) all ship in the [default catalog](https://github.com/xa17d/lanes-catalog-default) (subscribe to it in Settings) rather than as built-ins.
-  - **Agents & terminal** — Open Terminal here, Claude, and opencode (each a tagged iTerm session at the lane root) also ship in the [default catalog](https://github.com/xa17d/lanes-catalog-default).
-  - **Scripts** — drop an executable file in `<root>/.lanes/config/script/` to add a custom lane action (run with the lane dir as cwd); files under `script/repository/` become per-repo actions (run in the repo dir).
-    Scripts run silently with `LANE_DIR`/`LANE_NAME`/`LANE_ID`, `TICKET_KEY`/`TICKET_URL` for the lane's primary linked ticket (and `REPO_DIR`/`REPO_NAME` for repo scripts) in the environment; stderr from a failing script is shown as a toast.
-    Subscribe to a **catalog** (e.g. the [default catalog](https://github.com/xa17d/lanes-catalog-default)) in Settings to get ready-to-use scripts.
-- **Search** is fuzzy and subtree-wide: typing filters the current level, and a non-empty query surfaces nested actions with their breadcrumb (`service-api › Open PR`).
+- **⌥Space** opens a floating launcher from the menu bar — no Dock icon, no window in the way.
+- It lists your **lanes** (every folder under a root you choose), each with its description and a status badge. Open, create, rename, archive, and fuzzy-search them by name or description.
+- **Inside a lane** you get its **tickets**, its **repositories** (each with per-repo actions like Open PR or Open Terminal), and any custom **scripts** — every action either focuses an existing window or launches a new one.
+- **Search** spans the whole subtree, surfacing nested actions with a breadcrumb (`service-api › Open PR`).
+- Share and update actions, hooks, and templates across a team via **catalogs** — git repos of shared config you subscribe to in Settings.
 
-## Configuration
-
-Templates, custom actions (scripts), lane descriptions / status badges, and lifecycle hooks are all configured by dropping files under `<root>/.lanes/`.
-Teams can share and update those actions/hooks/templates by subscribing to **catalogs** (git repos of shared config) in Settings.
-See **[CONFIGURATION.md](CONFIGURATION.md)** for the full reference.
+A lane's description, status badge, hooks, custom scripts, and catalogs are all configured under `<root>/.lanes/` — see **[doc/CONFIGURATION.md](doc/CONFIGURATION.md)** for the full reference.
 
 ## Architecture
 
