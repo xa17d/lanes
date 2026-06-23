@@ -52,6 +52,8 @@ xcodebuild -project Lanes.xcodeproj -scheme Lanes -configuration Debug \
 open ./.build/Build/Products/Debug/Lanes.app
 ```
 
+Or just run **`./build-and-run.sh`**, which builds Debug and launches it.
+
 Lanes is a menu-bar accessory app: launching it adds a **menu-bar icon** and registers the **⌥Space** hotkey — there is **no Dock icon and no window on launch**.
 Press ⌥Space to open the launcher panel.
 
@@ -64,6 +66,11 @@ LANES_ROOT=/path/to/lanes \
 ```
 
 The app is unsandboxed (it runs `git` and drives Chrome / iTerm via Apple Events); the first such action triggers the macOS Automation permission prompt.
+
+## Install
+
+**`./install.sh`** builds a Release `Lanes.app` and installs it (→ `~/Applications`; pass `/Applications` to override), then launches it.
+Re-run it to update; enable **Launch at login** in Settings once installed.
 
 ## License
 

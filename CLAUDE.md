@@ -46,6 +46,7 @@ LANES_ROOT=/tmp/lanes LANES_AUTOSHOW=1 ./.build/Build/Products/Debug/Lanes.app/C
 `xcodebuild` needs the sandbox disabled (its daemon writes outside any allowed path).
 `.build/` is gitignored.
 The one SPM dependency (KeyboardShortcuts) resolves on first build.
+Wrappers: `build-and-run.sh` (Debug + launch), `install.sh` (Release → `~/Applications`).
 
 ## Testing
 
