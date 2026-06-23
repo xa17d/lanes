@@ -36,6 +36,8 @@ struct SettingsView: View {
     @ObservedObject var nav: SettingsNavigation
     @StateObject private var catalogs: CatalogsModel
     @AppStorage(SettingsKeys.ticketBaseURL) private var ticketBaseURL = ""
+    @State private var launchAtLogin = LoginItem.isEnabled
+    @State private var loginError: String?
 
     init(library: LaneLibrary, nav: SettingsNavigation) {
         _library = ObservedObject(wrappedValue: library)
@@ -87,6 +89,22 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Startup") {
+                Toggle("Launch at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, enabled in
+                        do {
+                            try LoginItem.setEnabled(enabled)
+                            loginError = nil
+                        } catch {
+                            loginError = error.localizedDescription
+                            launchAtLogin = LoginItem.isEnabled   // revert to actual state
+                        }
+                    }
+                if let loginError {
+                    Text(loginError).font(.caption).foregroundStyle(.red)
+                }
+            }
+
             Section("Tickets") {
                 TextField("Base URL", text: $ticketBaseURL,
                           prompt: Text("https://yourco.atlassian.net/browse/"))
@@ -110,6 +128,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { launchAtLogin = LoginItem.isEnabled }
     }
 
     @ViewBuilder
