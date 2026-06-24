@@ -54,10 +54,10 @@ struct LevelView: View {
                 }
                 .padding(.vertical, Tokens.Space.xs)
             }
-            .frame(maxHeight: Tokens.Size.panelMaxHeight)
-            .fixedSize(horizontal: false, vertical: true)
+            .frame(height: listHeight(rowCount: rows.count))
             .onChange(of: model.selection) { _, newValue in
-                let id = rows.indices.contains(newValue) ? rows[newValue].id : nil
+                guard rows.indices.contains(newValue) else { return }
+                let id = rows[newValue].id
                 if reduceMotion {
                     proxy.scrollTo(id, anchor: .center)
                 } else {
@@ -67,6 +67,11 @@ struct LevelView: View {
                 }
             }
         }
+    }
+
+    private func listHeight(rowCount: Int) -> CGFloat {
+        min(CGFloat(rowCount) * Tokens.Size.rowHeight + Tokens.Space.xs * 2,
+            Tokens.Size.panelMaxHeight)
     }
 
     private var shimmer: some View {
