@@ -205,6 +205,13 @@ nonisolated enum ConfigEdits {
     /// only if it actually exists in the checkout — so a renamed/removed item is
     /// silently skipped.
     static func enable(catalog id: String, item: String, in dir: URL, root: URL) {
+        // Idempotent: if a pointer for this catalog+item is already active here,
+        // don't add a second one. Guards against a double-seed race (two
+        // `seedDefaultIfNeeded` runs before the seeded flag is persisted) and
+        // against re-enabling an already-enabled item.
+        if pointers(in: dir).contains(where: {
+            $0.pointer.catalog == id && $0.pointer.item == item
+        }) { return }
         let folder = LaneFS.catalogCheckout(id: id, in: root).appendingPathComponent(item)
         guard fm.fileExists(atPath: folder.path) else { return }
         let meta = Catalogs.itemMeta(at: folder)
@@ -359,6 +366,12 @@ final class CatalogsModel: ObservableObject {
     /// for (so removing it isn't undone on the next launch).
     private static let seededRootsKey = "defaultCatalogSeededRoots"
 
+    /// Roots whose seed is currently running. The persisted `seededRootsKey` flag
+    /// is only written after the async clone+starter-set finishes, so without this
+    /// in-flight set a second `$root` emission could start a duplicate seed before
+    /// the first records itself — cloning twice and duplicating starter pointers.
+    private static var seedingRoots = Set<String>()
+
     /// On the first sighting of `root`, silently subscribe to the default catalog
     /// and enable a starter set. Gated so it runs once per root; a clone failure
     /// (e.g. offline) leaves it unseeded to retry next launch. `onChange` runs on
@@ -367,21 +380,27 @@ final class CatalogsModel: ObservableObject {
     static func seedDefaultIfNeeded(root: URL, onChange: @escaping @MainActor () -> Void) {
         let defaults = UserDefaults.standard
         var seeded = Set(defaults.stringArray(forKey: seededRootsKey) ?? [])
-        guard !seeded.contains(root.path), let id = Catalogs.id(forURL: Catalogs.defaultURL) else { return }
+        guard !seeded.contains(root.path), !seedingRoots.contains(root.path),
+              let id = Catalogs.id(forURL: Catalogs.defaultURL) else { return }
         // Already present (e.g. added manually) → mark seeded, don't duplicate.
         if Catalogs.config(id: id, root: root) != nil {
             seeded.insert(root.path)
             defaults.set(Array(seeded), forKey: seededRootsKey)
             return
         }
+        seedingRoots.insert(root.path)
         Task.detached {
+            var didSeed = false
             do {
                 try Catalogs.add(url: Catalogs.defaultURL, ref: "", root: root, shell: Shell())
                 ConfigEdits.enableStarterSet(catalog: id, root: root)
+                didSeed = true
             } catch {
-                return   // leave unseeded so it retries next launch
+                // leave unseeded so it retries next launch
             }
             await MainActor.run {
+                Self.seedingRoots.remove(root.path)
+                guard didSeed else { return }
                 let store = UserDefaults.standard
                 var s = Set(store.stringArray(forKey: Self.seededRootsKey) ?? [])
                 s.insert(root.path)
