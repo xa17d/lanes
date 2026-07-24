@@ -216,8 +216,44 @@ nonisolated enum LaneFS {
         return try self.lane(at: dest)
     }
 
+    /// Delete a lane robustly, even while another app (Fork, an editor) still
+    /// has files inside its git clone open.
+    ///
+    /// A bare recursive `removeItem` races such apps: as it empties a directory
+    /// and then `rmdir`s it, the other app writes a fresh file back in (index
+    /// refresh, fetch head, Fork's `.git/fork-settings`, …), the `rmdir` fails
+    /// with ENOTEMPTY, and the whole call throws mid-traversal — leaving the
+    /// lane half-deleted (the "fails on the first try" symptom).
+    ///
+    /// Instead: atomically move the lane aside with a single `rename(2)`, which
+    /// always succeeds regardless of open handles and instantly removes it from
+    /// the list, then recursively delete the staged copy. The staged name is
+    /// hidden so a partial teardown can never resurface as a visible lane, and
+    /// the delete is retried to absorb any residual writes from an app that
+    /// still had the *old* path open.
     static func delete(_ lane: Lane) throws {
-        try fm.removeItem(at: lane.url)
+        let parent = lane.url.deletingLastPathComponent()
+        let staged = parent.appendingPathComponent(
+            ".\(lane.url.lastPathComponent).deleting-\(UUID().uuidString.prefix(8))",
+            isDirectory: true)
+        try fm.moveItem(at: lane.url, to: staged)   // atomic; this is the user-visible delete
+        removeWithRetry(staged)                      // best-effort; never throws
+    }
+
+    /// Recursively delete `url`, retrying a few times with a short backoff so a
+    /// straggling write from an app that still had the tree open can't abort it.
+    /// Best-effort: if it still can't finish, the (hidden) folder is left behind
+    /// rather than surfacing an error for an already-removed lane.
+    private static func removeWithRetry(_ url: URL, attempts: Int = 4) {
+        for attempt in 0..<attempts {
+            do {
+                try fm.removeItem(at: url)
+                return
+            } catch {
+                guard attempt < attempts - 1 else { return }
+                Thread.sleep(forTimeInterval: 0.15 * Double(attempt + 1))
+            }
+        }
     }
 
     // MARK: - Helpers
