@@ -61,6 +61,46 @@ if [[ -n "$LANE_ID" ]]; then
 APPLESCRIPT
 fi
 
+# ── Ghostty: close tabs whose terminal is at (or under) the lane dir ─────────
+# Ghostty reports each surface's working directory; that's the per-lane key
+# (one tab per lane). Closing the terminal closes just that tab, never the
+# window that holds every other lane's tab. LANE_DIR is passed as an argument
+# so paths with spaces/colons need no escaping.
+if [[ -n "$LANE_DIR" ]]; then
+  osascript - "$LANE_DIR" <<'APPLESCRIPT' >/dev/null 2>&1 || true
+on run argv
+  set laneDir to item 1 of argv
+  if laneDir is "" then return
+  set laneSlash to laneDir & "/"
+  if not (application "Ghostty" is running) then return
+  tell application "Ghostty"
+    with timeout of 8 seconds
+      -- Close one match at a time, rescanning, so closing a tab can't
+      -- invalidate the references we're still iterating.
+      repeat 50 times
+        set target to missing value
+        repeat with t in terminals
+          set wd to ""
+          try
+            set wd to (working directory of t)
+          end try
+          if wd is laneDir or wd starts with laneSlash then
+            set target to t
+            exit repeat
+          end if
+        end repeat
+        if target is missing value then exit repeat
+        try
+          close target
+        end try
+        delay 0.1
+      end repeat
+    end timeout
+  end tell
+end run
+APPLESCRIPT
+fi
+
 # ── Chrome: close tabs whose URL contains the ticket key ─────────────────────
 if [[ -n "$TICKET_KEY" ]]; then
   osascript <<APPLESCRIPT >/dev/null 2>&1 || true

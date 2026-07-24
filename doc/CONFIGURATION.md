@@ -230,6 +230,7 @@ chmod +x .lanes/config/hook/cleanup
 It closes, best-effort:
 
 - **iTerm2 + Claude** — the sessions this lane opened (Lanes tags them with a `user.lane` variable; Claude runs inside them). *Automation permission.*
+- **Ghostty + Claude** — the tabs whose terminal is at (or under) the lane dir; Ghostty reports each surface's working directory, so no tagging is needed and only the lane's own tab is closed. *Automation permission.*
 - **Chrome tabs** — tabs whose URL contains the lane's `TICKET_KEY`. *Automation permission.*
 - **Fork / VS Code** — windows whose title contains the lane or repo folder name. *Needs **Accessibility** permission: System Settings → Privacy & Security → Accessibility → enable Lanes.* Without it, these two are simply skipped; iTerm/Chrome still work.
 
