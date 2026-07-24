@@ -159,11 +159,12 @@ No-op without the hook; see [Hooks](#hooks).
 ## Hooks
 
 Executable scripts in `.lanes/config/hook/` run at specific moments.
-Both hooks below fire **when a lane is created** and **whenever you press ⌘R** (at the lane list this refreshes every listed lane; inside a lane, just the open one — folders adopted from outside the app catch up on the next ⌘R).
+`extract-ticket` and `update-lane-description` fire **when a lane is created** and **whenever you press ⌘R** (at the lane list this refreshes every listed lane; inside a lane, just the open one — folders adopted from outside the app catch up on the next ⌘R).
 `update-lane-description` also re-runs on its own when its description sets a [`{{refresh:…}}`](#refreshduration--auto-refresh) interval.
+`cleanup` instead fires **just before a lane is archived or deleted**.
 Each runs with the **lane folder** as the working directory and the `LANE_DIR` / `LANE_NAME` / `LANE_ID` variables exported.
 
-When both are present they run in a **fixed order**, so a later hook can build on an earlier one:
+The create/refresh hooks run in a **fixed order**, so a later hook can build on an earlier one:
 
 1. **`extract-ticket`** — links a ticket to the lane.
 2. **`update-lane-description`** — sets the description, and additionally gets `TICKET_KEY` / `TICKET_URL` for the lane's primary ticket (so the description can mention the ticket the first hook just linked).
@@ -212,6 +213,25 @@ fi
 ```sh
 chmod +x .lanes/config/hook/update-lane-description
 ```
+
+### `cleanup`
+
+Runs **just before a lane is archived or deleted** — while the lane folder still exists — so it can tear down the windows the lane opened. Closing the lane's **Fork** window first also stops Fork throwing a pop-up per `.git` file as the clone is removed.
+
+It receives `LANE_DIR` / `LANE_NAME` / `LANE_ID` and, when a ticket is linked, `TICKET_KEY` / `TICKET_URL`. Its output is ignored, and any failure (or a missing/non-executable hook) is a no-op — the archive/delete always proceeds. It runs synchronously, so keep it quick; the shipped example time-boxes each AppleScript call.
+
+A ready-made example lives at [`doc/examples/cleanup`](examples/cleanup). Copy it in and make it executable:
+
+```sh
+cp doc/examples/cleanup .lanes/config/hook/cleanup
+chmod +x .lanes/config/hook/cleanup
+```
+
+It closes, best-effort:
+
+- **iTerm2 + Claude** — the sessions this lane opened (Lanes tags them with a `user.lane` variable; Claude runs inside them). *Automation permission.*
+- **Chrome tabs** — tabs whose URL contains the lane's `TICKET_KEY`. *Automation permission.*
+- **Fork / VS Code** — windows whose title contains the lane or repo folder name. *Needs **Accessibility** permission: System Settings → Privacy & Security → Accessibility → enable Lanes.* Without it, these two are simply skipped; iTerm/Chrome still work.
 
 ---
 
