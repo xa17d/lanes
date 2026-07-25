@@ -270,6 +270,8 @@ hook/
     jira-summary/      { describe.sh, lanes-item.json }   ← a second variant
   extract-ticket/
     leading-key/       { extract.sh, lanes-item.json }
+  cleanup/
+    close-windows/     { cleanup.sh, lanes-item.json }
 template/
   default/
     CLAUDE.md                            ← everything except the companion is seeded
@@ -304,7 +306,7 @@ A `.catalog` file is JSON that locates a catalog **item folder**; its **own file
 
 The same mechanism works for singletons:
 
-- **Hooks** — `hook/extract-ticket.catalog` / `hook/update-lane-description.catalog` (with `"item": "hook/<role>/<variant>"`).
+- **Hooks** — `hook/extract-ticket.catalog` / `hook/update-lane-description.catalog` / `hook/cleanup.catalog` (with `"item": "hook/<role>/<variant>"`).
 - **Template** — `config/template.catalog` (with `"item": "template/<variant>"`).
 
 For these singletons the **pointer wins** when both a pointer and a local file exist — delete the pointer to fall back to your local version.

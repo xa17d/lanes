@@ -274,6 +274,7 @@ struct HooksTab: View {
 
     @State private var ticket: String?
     @State private var describe: String?
+    @State private var cleanup: String?
     @State private var template: String?
 
     var body: some View {
@@ -282,6 +283,8 @@ struct HooksTab: View {
                         blurb: "Runs on lane creation and ⌘R. Its output is treated as a ticket key and linked to the lane.")
             hookSection(LaneHooks.descriptionHook, title: "Update lane description", selection: $describe,
                         blurb: "Runs on lane creation and ⌘R. Its output becomes the lane's description (it may carry {{badge:…}} / {{refresh:…}}).")
+            hookSection(LaneHooks.cleanupHook, title: "Cleanup", selection: $cleanup,
+                        blurb: "Runs just before a lane is archived or deleted, while the folder still exists. Best-effort: its output is ignored and a failure never blocks the archive/delete.")
             templateSection()
         }
         .formStyle(.grouped)
@@ -357,6 +360,7 @@ struct HooksTab: View {
     private func reloadSelections() {
         ticket = key(ConfigEdits.hookPointer(LaneHooks.ticketHook, root: root))
         describe = key(ConfigEdits.hookPointer(LaneHooks.descriptionHook, root: root))
+        cleanup = key(ConfigEdits.hookPointer(LaneHooks.cleanupHook, root: root))
         template = key(ConfigEdits.templatePointer(root: root))
     }
 
