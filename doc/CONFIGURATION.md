@@ -15,6 +15,7 @@ Drop files in the right place and they take effect immediately — there's no se
     │   └── github.com_my-org_lanes-catalog/
     │       ├── catalog.json ← { url, ref, pin, … }
     │       └── checkout/    ← the git clone (a rebuildable cache)
+    ├── repos.json           ← known-repos list for the "Clone repo…" action
     └── config/              ← user configuration (everything below is optional)
         ├── template/        ← seeds the contents of every new lane
         ├── template.catalog ← OR point the template at a catalog (pointer wins)
@@ -23,6 +24,7 @@ Drop files in the right place and they take effect immediately — there's no se
         │   ├── 20---arrow.up---shared deploy.catalog … a catalog action (pointer)
         │   └── repository/                        … per-repository actions
         │       └── 10---arrow.clockwise---fetch.sh
+        ├── clone-repo       ← OPTIONAL custom handler for "Clone repo…"
         └── hook/            ← lifecycle hooks (fixed names, run in order)
             ├── extract-ticket          … 1. link a ticket from the folder name
             └── update-lane-description … 2. set the description
@@ -120,6 +122,39 @@ git -C "$REPO_DIR" fetch --all --prune
 ```sh
 chmod +x ".lanes/config/script/10---link---open ticket.sh"
 chmod +x ".lanes/config/script/repository/10---arrow.triangle.2.circlepath---fetch.sh"
+```
+
+---
+
+## Cloning repos
+
+Inside a lane, **Clone repo…** lets you search a repo you've cloned before and clone it into the current lane - handy when a fresh lane needs the same repos as your other work.
+
+**The list fills itself.** Every repo Lanes discovers in any lane under this root is recorded (by its `origin` URL) in `.lanes/repos.json`, so once you've cloned a repo through Lanes it's in the list for every future lane.
+The ssh and https forms of the same repo collapse into one entry.
+You can also seed a repo you haven't cloned yet with **Add repo to list…** (paste a clone URL), and remove stale ones.
+Because the list is indexed like everything else, typing a repo name from the lane's top level jumps straight to it (`Clone repo… › my-service`).
+
+Selecting a repo clones it into `<lane>/<repo-name>`; an existing folder of that name is an error (Lanes never overwrites).
+
+### Custom clone handler (optional)
+
+By default Lanes runs a plain `git clone`.
+To control clone flags (shallow, submodules, LFS) or run post-clone setup, drop an executable **`.lanes/config/clone-repo`** (or point it at a catalog with a `clone-repo.catalog` pointer, which wins over the local file).
+Lanes runs it with the **lane folder** as the working directory and these variables exported:
+
+| Variable | Value |
+| --- | --- |
+| `REPO_URL` | the clone URL (ssh or https, exactly as stored) |
+| `REPO_NAME` | the repo slug / destination folder name |
+| `LANE_DIR` / `LANE_NAME` / `LANE_ID` | the lane |
+
+A nonzero exit aborts the clone and surfaces stderr as an error toast, so fail loudly.
+A ready-made example (submodules + optional post-clone hook) lives at [`doc/examples/clone-repo`](examples/clone-repo):
+
+```sh
+cp doc/examples/clone-repo .lanes/config/clone-repo
+chmod +x .lanes/config/clone-repo
 ```
 
 ---

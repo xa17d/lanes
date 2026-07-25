@@ -95,9 +95,17 @@ nonisolated struct GitInspector: Sendable {
     }
 
     func remote(of repo: URL) -> GitRemote? {
+        remoteURL(of: repo).flatMap(GitRemote.parse)
+    }
+
+    /// The raw `origin` URL as configured (unparsed), so the exact clone form —
+    /// ssh vs https, and the user's auth setup — is preserved for re-cloning and
+    /// for the known-repos registry. nil when there is no `origin`.
+    func remoteURL(of repo: URL) -> String? {
         guard let out = try? shell.run(gitPath, ["-C", repo.path, "remote", "get-url", "origin"]) else {
             return nil
         }
-        return GitRemote.parse(out.trimmingCharacters(in: .whitespacesAndNewlines))
+        let s = out.trimmingCharacters(in: .whitespacesAndNewlines)
+        return s.isEmpty ? nil : s
     }
 }

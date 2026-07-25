@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#
+# clone-repo — custom handler for the lane "Clone repo…" action.
+#
+# When present and executable at .lanes/config/clone-repo (or pointed at a
+# catalog via clone-repo.catalog), Lanes runs this instead of its built-in
+# `git clone`, with the lane folder as the working directory. Use it to control
+# clone flags (depth, submodules, LFS) and run any post-clone setup.
+#
+# Env from Lanes:
+#   REPO_URL   — the clone URL (ssh or https, exactly as stored)
+#   REPO_NAME  — the repo slug / destination folder name
+#   LANE_DIR, LANE_NAME, LANE_ID
+#
+# A nonzero exit aborts the clone and surfaces stderr as an error toast, so fail
+# loudly. Lanes has already checked that ./$REPO_NAME does not exist.
+set -euo pipefail
+
+git clone --recurse-submodules -- "$REPO_URL" "$REPO_NAME"
+
+# Optional post-clone setup, e.g.:
+# cd "$REPO_NAME" && [ -x ./bootstrap.sh ] && ./bootstrap.sh

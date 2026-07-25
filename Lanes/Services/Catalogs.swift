@@ -286,9 +286,10 @@ nonisolated enum Catalogs {
                 }
             }
         }
-        let template = LaneFS.templatePointer(in: root)
-        if JSONFile.read(Pointer.self, at: template)?.catalog == id {
-            try? fm.removeItem(at: template)
+        for singleton in [LaneFS.templatePointer(in: root), LaneFS.cloneScriptPointer(in: root)] {
+            if JSONFile.read(Pointer.self, at: singleton)?.catalog == id {
+                try? fm.removeItem(at: singleton)
+            }
         }
     }
 

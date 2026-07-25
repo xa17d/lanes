@@ -27,11 +27,12 @@ nonisolated struct RepositoryProvider: LaneProvider {
         let lane = lane
         let ticket = TicketProvider.primaryEnv(store: store, baseURL: services.ticketBaseURL)
 
-        // Read branches per-repo concurrently.
-        return await withTaskGroup(of: (Int, any Item).self) { group in
+        // Read branch + origin URL per-repo concurrently.
+        let collected = await withTaskGroup(of: (Int, any Item, String?).self) { group in
             for (index, repoURL) in repos.enumerated() {
                 group.addTask {
                     let branch = git.branch(of: repoURL)
+                    let remote = git.remoteURL(of: repoURL)
                     let item = BasicItem(
                         id: "repo:\(repoURL.path)",
                         title: repoURL.lastPathComponent,
@@ -43,12 +44,17 @@ nonisolated struct RepositoryProvider: LaneProvider {
                                               lane: lane, ticket: ticket)
                         }
                     )
-                    return (index, item)
+                    return (index, item, remote)
                 }
             }
-            var collected: [(Int, any Item)] = []
-            for await pair in group { collected.append(pair) }
-            return collected.sorted { $0.0 < $1.0 }.map(\.1)
+            var out: [(Int, any Item, String?)] = []
+            for await triple in group { out.append(triple) }
+            return out.sorted { $0.0 < $1.0 }
         }
+
+        // Record the origins we found so a future lane can clone them again
+        // (best-effort; writes only when the known-repos list actually changes).
+        RepoRegistry(root: root).harvest(collected.compactMap { $0.2 })
+        return collected.map { $0.1 }
     }
 }

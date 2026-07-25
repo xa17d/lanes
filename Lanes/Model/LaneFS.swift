@@ -75,6 +75,27 @@ nonisolated enum LaneFS {
         configDir(in: root).appendingPathComponent("hook", isDirectory: true)
     }
 
+    /// `<root>/.lanes/config/clone-repo` — optional handler for the "Clone repo…"
+    /// action (run with the lane dir as cwd and `REPO_URL`/`REPO_NAME` exported).
+    /// When absent, Lanes falls back to a plain `git clone`.
+    static func cloneScript(in root: URL) -> URL {
+        configDir(in: root).appendingPathComponent("clone-repo")
+    }
+
+    /// `<root>/.lanes/config/clone-repo.catalog` — optional pointer to a
+    /// clone-repo handler inside a catalog. When present it takes precedence over
+    /// the local `clone-repo` file (like the hook/template singletons).
+    static func cloneScriptPointer(in root: URL) -> URL {
+        configDir(in: root).appendingPathComponent("clone-repo.catalog")
+    }
+
+    /// `<root>/.lanes/repos.json` — the per-root known-repos registry that backs
+    /// the "Clone repo…" action (auto-harvested from discovered repos + manual
+    /// additions).
+    static func repoRegistryURL(in root: URL) -> URL {
+        lanesDir(in: root).appendingPathComponent("repos.json")
+    }
+
     // MARK: - Catalogs
 
     /// `<root>/.lanes/catalog` — subscribed catalogs (shared config git repos).
