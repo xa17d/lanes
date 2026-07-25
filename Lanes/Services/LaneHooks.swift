@@ -25,6 +25,7 @@ nonisolated struct LaneHooks: Sendable {
 
     static let ticketHook = "extract-ticket"
     static let descriptionHook = "update-lane-description"
+    static let cleanupHook = "cleanup"
 
     /// Per-lane store key tracking the last `update-lane-description` run, used
     /// by the `{{refresh:…}}` directive to decide when a description is stale.
@@ -60,6 +61,28 @@ nonisolated struct LaneHooks: Sendable {
         if let last = store.value(RefreshState.self, Self.refreshKey)?.lastRunAt,
            now.timeIntervalSince(last) < interval { return nil }
         return applyDescription(to: lane, root: root, store: store)
+    }
+
+    /// Run the `cleanup` hook for `lane` (best-effort, fire-and-forget) right
+    /// before the lane is archived or deleted, so a user script can tear down
+    /// the lane's windows — its tagged iTerm/Claude sessions, the Fork window,
+    /// matching Chrome tabs — while the lane folder still exists. The hook gets
+    /// `LANE_DIR`/`LANE_NAME`/`LANE_ID` and, when a ticket is linked, the
+    /// lane's `TICKET_KEY`/`TICKET_URL` so it can match windows/tabs.
+    ///
+    /// A missing hook, a failure, or a non-zero exit is a no-op: the caller
+    /// always proceeds with the archive/delete. Runs synchronously so windows
+    /// are gone before the folder is moved/removed; the shipped example script
+    /// time-boxes its own AppleScript so a wedged app can't stall the action.
+    func cleanup(_ lane: Lane, root: URL) {
+        guard hookExists(Self.cleanupHook, root: root) else { return }
+        let store = LaneStore(lane: lane)
+        var env = laneEnv(lane)
+        if let ticket = TicketProvider.primaryEnv(store: store, baseURL: baseURL) {
+            env["TICKET_KEY"] = ticket.key
+            env["TICKET_URL"] = ticket.url
+        }
+        _ = stdout(of: Self.cleanupHook, for: lane, root: root, env: env)
     }
 
     // MARK: - Individual hooks

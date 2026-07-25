@@ -38,19 +38,19 @@ nonisolated enum LaneActions {
 
     /// A single "Manage lane…" container drilling into the management actions,
     /// for use from *inside* an already-open lane (so "Open" is omitted).
-    static func manageLaneItem(for lane: Lane, apps: AppLauncher) -> any Item {
+    static func manageLaneItem(for lane: Lane, apps: AppLauncher, hooks: LaneHooks) -> any Item {
         let root = root(of: lane)
         return BasicItem(id: "lane:manage", title: "Manage lane…", icon: .manage,
                          keywords: ["manage", "rename", "archive", "delete", "settings"],
                          isSecondary: true,
                          childrenProvider: {
-                             managementItems(for: lane, root: root, apps: apps)
+                             managementItems(for: lane, root: root, apps: apps, hooks: hooks)
                          })
     }
 
     /// Rename / reveal / archive / delete for a lane. Shown from inside the
     /// lane (via "Manage lane…"), so it does not include an "Open" action.
-    static func managementItems(for lane: Lane, root: URL, apps: AppLauncher) -> [any Item] {
+    static func managementItems(for lane: Lane, root: URL, apps: AppLauncher, hooks: LaneHooks) -> [any Item] {
         var items: [any Item] = []
 
         items.append(BasicItem(id: "mgmt:rename", title: "Rename…", icon: .rename,
@@ -88,7 +88,11 @@ nonisolated enum LaneActions {
                                    run: { _ = try LaneFS.unarchive(lane, in: root); return .popToRoot }))
         } else {
             items.append(BasicItem(id: "mgmt:archive", title: "Archive", icon: .archive,
-                                   run: { _ = try LaneFS.archive(lane, in: root); return .popToRoot }))
+                                   run: {
+                                       hooks.cleanup(lane, root: root)
+                                       _ = try LaneFS.archive(lane, in: root)
+                                       return .popToRoot
+                                   }))
         }
 
         items.append(BasicItem(id: "mgmt:delete", title: "Delete…", icon: .trash,
@@ -96,7 +100,11 @@ nonisolated enum LaneActions {
                                    .pushItems(title: "Delete “\(lane.name)”?", items: [
                                        BasicItem(id: "mgmt:delete:confirm", title: "Delete permanently",
                                                  icon: .trash,
-                                                 run: { try LaneFS.delete(lane); return .popToRoot }),
+                                                 run: {
+                                                     hooks.cleanup(lane, root: root)
+                                                     try LaneFS.delete(lane)
+                                                     return .popToRoot
+                                                 }),
                                        BasicItem(id: "mgmt:delete:cancel", title: "Cancel", icon: .generic,
                                                  run: { .pop }),
                                    ])

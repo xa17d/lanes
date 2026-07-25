@@ -15,6 +15,7 @@ nonisolated struct LaneManagementProvider: LaneProvider {
     var displayName: String { "Manage" }
 
     func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
-        [LaneActions.manageLaneItem(for: lane, apps: services.apps)]
+        let hooks = LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL)
+        return [LaneActions.manageLaneItem(for: lane, apps: services.apps, hooks: hooks)]
     }
 }
