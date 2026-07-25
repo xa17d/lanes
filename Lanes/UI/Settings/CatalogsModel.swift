@@ -273,6 +273,28 @@ nonisolated enum ConfigEdits {
         if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
     }
 
+    /// The pointer bound to the clone-repo handler, if any.
+    static func cloneScriptPointer(root: URL) -> Catalogs.Pointer? {
+        JSONFile.read(Catalogs.Pointer.self, at: LaneFS.cloneScriptPointer(in: root))
+    }
+
+    static func setCloneScriptPointer(catalog: String, item: String, root: URL) throws {
+        try writePointer(Catalogs.Pointer(catalog: catalog, item: item),
+                         to: LaneFS.cloneScriptPointer(in: root))
+    }
+
+    static func clearCloneScriptPointer(root: URL) throws {
+        let url = LaneFS.cloneScriptPointer(in: root)
+        if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
+    }
+
+    /// Whether a local (non-pointer) executable clone-repo handler exists.
+    static func hasLocalCloneScript(root: URL) -> Bool {
+        let url = LaneFS.cloneScript(in: root)
+        let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+        return isRegular && fm.isExecutableFile(atPath: url.path)
+    }
+
     // MARK: Internals
 
     private static func hookPointerURL(_ name: String, root: URL) -> URL {

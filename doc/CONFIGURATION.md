@@ -140,7 +140,7 @@ Selecting a repo clones it into `<lane>/<repo-name>`; an existing folder of that
 ### Custom clone handler (optional)
 
 By default Lanes runs a plain `git clone`.
-To control clone flags (shallow, submodules, LFS) or run post-clone setup, drop an executable **`.lanes/config/clone-repo`** (or point it at a catalog with a `clone-repo.catalog` pointer, which wins over the local file).
+To control clone flags (shallow, submodules, LFS) or run post-clone setup, drop an executable **`.lanes/config/clone-repo`** (or select a catalog-provided handler from **Settings → Catalogs → Hooks**, which writes a `clone-repo.catalog` pointer that wins over the local file).
 Lanes runs it with the **lane folder** as the working directory and these variables exported:
 
 | Variable | Value |

@@ -276,6 +276,7 @@ struct HooksTab: View {
     @State private var describe: String?
     @State private var cleanup: String?
     @State private var template: String?
+    @State private var clone: String?
 
     var body: some View {
         Form {
@@ -286,6 +287,7 @@ struct HooksTab: View {
             hookSection(LaneHooks.cleanupHook, title: "Cleanup", selection: $cleanup,
                         blurb: "Runs just before a lane is archived or deleted, while the folder still exists. Best-effort: its output is ignored and a failure never blocks the archive/delete.")
             templateSection()
+            cloneSection()
         }
         .formStyle(.grouped)
         .onAppear(perform: reloadSelections)
@@ -350,6 +352,37 @@ struct HooksTab: View {
         }
     }
 
+    @ViewBuilder
+    private func cloneSection() -> some View {
+        let variants = ConfigEdits.available(root: root, subdir: "clone-repo")
+        let hasLocal = ConfigEdits.hasLocalCloneScript(root: root)
+        Section {
+            VStack(alignment: .leading, spacing: 10) {
+                header("Clone handler", "Runs when you pick a repo in a lane's “Clone repo…” action, to control how it's cloned (depth, submodules, post-clone setup).")
+                if variants.isEmpty && !hasLocal {
+                    Text("No “clone-repo” in your catalogs — Lanes uses the built-in git clone.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(variants) { item in
+                    let k = key(item.catalog, item.item)
+                    RadioRow(selected: clone == k,
+                             title: "\(item.name)  ·  \(model.name(for: item.catalog))",
+                             detail: item.detail) {
+                        clone = k
+                        try? ConfigEdits.setCloneScriptPointer(catalog: item.catalog, item: item.item, root: root)
+                    }
+                }
+                RadioRow(selected: clone == nil,
+                         title: hasLocal ? "Local" : "Built-in git clone",
+                         detail: hasLocal ? "Uses the local clone-repo handler."
+                                          : "No handler — Lanes runs a plain git clone.") {
+                    clone = nil
+                    try? ConfigEdits.clearCloneScriptPointer(root: root)
+                }
+            }
+        }
+    }
+
     private func header(_ title: String, _ blurb: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(.headline)
@@ -362,6 +395,7 @@ struct HooksTab: View {
         describe = key(ConfigEdits.hookPointer(LaneHooks.descriptionHook, root: root))
         cleanup = key(ConfigEdits.hookPointer(LaneHooks.cleanupHook, root: root))
         template = key(ConfigEdits.templatePointer(root: root))
+        clone = key(ConfigEdits.cloneScriptPointer(root: root))
     }
 
     private func key(_ pointer: Catalogs.Pointer?) -> String? {
