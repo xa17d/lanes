@@ -1,182 +1,47 @@
 #!/usr/bin/env bash
 #
-# cleanup — tear down a lane's windows just before it is archived or deleted.
-#
-# Lanes runs this (if present and executable) from .lanes/config/hook/cleanup,
-# with the lane folder as the working directory, right before the archive/delete
-# so the windows are gone before the folder moves. Closing the lane's Fork window
-# first also stops Fork spewing "repository could not be read" dialogs as the
-# clone disappears.
+# cleanup — runs just before a lane is archived or deleted, from
+# .lanes/config/hook/cleanup, with the lane folder as the working directory.
+# Use it to tear down whatever the lane opened (terminal tabs, editor windows,
+# browser tabs). Best-effort: its output is ignored and a non-zero exit never
+# blocks the archive/delete.
 #
 # Env from Lanes:
 #   LANE_DIR, LANE_NAME, LANE_ID   — always
 #   TICKET_KEY, TICKET_URL         — when a ticket is linked to the lane
 #
-# Everything here is BEST-EFFORT: each block is guarded, and the script always
-# exits 0, so a missing/closed app never blocks the delete.
-#
-#   Reliable (Automation / Apple Events only):
-#     • iTerm2 — closes the sessions this lane opened (Claude runs inside them).
-#     • Chrome — closes tabs whose URL contains the lane's ticket key.
-#   Best-effort (needs Accessibility: System Settings → Privacy & Security →
-#   Accessibility → enable Lanes), matched by window title:
-#     • Fork, VS Code.
-#
-# NB: -e is deliberately OFF — a failing block must not abort the rest.
+# This example just closes the iTerm2 sessions this lane opened. For a fuller
+# version that also handles Ghostty, Chrome, Fork and VS Code, enable the
+# "Close lane windows" cleanup hook from the default catalog
+# (Settings → Catalogs → Hooks).
 set -uo pipefail
 
 LANE_ID="${LANE_ID:-}"
-LANE_DIR="${LANE_DIR:-$PWD}"
-LANE_NAME="${LANE_NAME:-}"
-TICKET_KEY="${TICKET_KEY:-}"
+[[ -n "$LANE_ID" ]] || exit 0
 
-# ── iTerm2: close every session tagged «lane:<LANE_ID>:…» ────────────────────
-# (Lanes tags each session it opens with a user.lane variable; see ITermController.)
-if [[ -n "$LANE_ID" ]]; then
-  osascript <<APPLESCRIPT >/dev/null 2>&1 || true
-  if application "iTerm2" is running then
-    set thePrefix to "«lane:${LANE_ID}:"
-    tell application "iTerm2"
-      with timeout of 5 seconds
-        set toClose to {}
-        repeat with w in windows
-          repeat with t in tabs of w
-            repeat with s in sessions of t
-              set tg to ""
+# Close every iTerm2 session Lanes tagged «lane:<LANE_ID>:…».
+osascript <<APPLESCRIPT >/dev/null 2>&1 || true
+if application "iTerm2" is running then
+  tell application "iTerm2"
+    with timeout of 5 seconds
+      repeat with w in windows
+        repeat with t in tabs of w
+          repeat with s in sessions of t
+            set tg to ""
+            try
+              tell s to set tg to (variable named "user.lane")
+            end try
+            if tg starts with "«lane:${LANE_ID}:" then
               try
-                tell s to set tg to (variable named "user.lane")
+                tell s to close
               end try
-              if tg starts with thePrefix then set end of toClose to s
-            end repeat
+            end if
           end repeat
         end repeat
-        repeat with s in toClose
-          try
-            tell s to close
-          end try
-        end repeat
-      end timeout
-    end tell
-  end if
-APPLESCRIPT
-fi
-
-# ── Ghostty: close tabs whose terminal is at (or under) the lane dir ─────────
-# Ghostty reports each surface's working directory; that's the per-lane key
-# (one tab per lane). Closing the terminal closes just that tab, never the
-# window that holds every other lane's tab. LANE_DIR is passed as an argument
-# so paths with spaces/colons need no escaping.
-if [[ -n "$LANE_DIR" ]]; then
-  osascript - "$LANE_DIR" <<'APPLESCRIPT' >/dev/null 2>&1 || true
-on run argv
-  set laneDir to item 1 of argv
-  if laneDir is "" then return
-  set laneSlash to laneDir & "/"
-  if not (application "Ghostty" is running) then return
-  tell application "Ghostty"
-    with timeout of 8 seconds
-      -- Close one match at a time, rescanning, so closing a tab can't
-      -- invalidate the references we're still iterating.
-      repeat 50 times
-        set target to missing value
-        repeat with t in terminals
-          set wd to ""
-          try
-            set wd to (working directory of t)
-          end try
-          if wd is laneDir or wd starts with laneSlash then
-            set target to t
-            exit repeat
-          end if
-        end repeat
-        if target is missing value then exit repeat
-        try
-          close target
-        end try
-        delay 0.1
       end repeat
     end timeout
   end tell
-end run
+end if
 APPLESCRIPT
-fi
-
-# ── Chrome: close tabs whose URL contains the ticket key ─────────────────────
-if [[ -n "$TICKET_KEY" ]]; then
-  osascript <<APPLESCRIPT >/dev/null 2>&1 || true
-  if application "Google Chrome" is running then
-    tell application "Google Chrome"
-      with timeout of 5 seconds
-        repeat with w in windows
-          set toClose to {}
-          repeat with t in tabs of w
-            try
-              if (URL of t) contains "${TICKET_KEY}" then set end of toClose to t
-            end try
-          end repeat
-          repeat with t in toClose
-            try
-              close t
-            end try
-          end repeat
-        end repeat
-      end timeout
-    end tell
-  end if
-APPLESCRIPT
-fi
-
-# ── Fork / VS Code: close windows whose title contains a repo/lane name ───────
-# Collect candidate names: the lane folder plus any git repo folders inside it.
-# Empty names are dropped so we can never match "every window".
-names=()
-[[ -n "$LANE_NAME" ]] && names+=("$LANE_NAME")
-while IFS= read -r gitpath; do
-  repo="$(basename "$(dirname "$gitpath")")"
-  [[ -n "$repo" ]] && names+=("$repo")
-done < <(find "$LANE_DIR" -maxdepth 2 -name .git 2>/dev/null)
-
-if [[ ${#names[@]} -gt 0 ]]; then
-  # de-dup
-  IFS=$'\n' names=($(printf '%s\n' "${names[@]}" | sort -u)); unset IFS
-
-  close_windows_by_title() {
-    local proc="$1"; shift
-    [[ $# -gt 0 ]] || return 0
-    osascript - "$proc" "$@" <<'APPLESCRIPT' >/dev/null 2>&1 || true
-on run argv
-  set procName to item 1 of argv
-  set needles to rest of argv
-  if needles is {} then return
-  tell application "System Events"
-    if not (exists process procName) then return
-    tell process procName
-      with timeout of 5 seconds
-        repeat with win in (every window)
-          set wname to ""
-          try
-            set wname to name of win
-          end try
-          if wname is not "" then
-            repeat with n in needles
-              if wname contains (n as text) then
-                try
-                  click (first button of win whose subrole is "AXCloseButton")
-                end try
-                exit repeat
-              end if
-            end repeat
-          end if
-        end repeat
-      end timeout
-    end tell
-  end tell
-end run
-APPLESCRIPT
-  }
-
-  close_windows_by_title "Fork" "${names[@]}"
-  close_windows_by_title "Code" "${names[@]}"   # VS Code's process is "Code"
-fi
 
 exit 0

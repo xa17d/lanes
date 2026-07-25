@@ -218,21 +218,22 @@ chmod +x .lanes/config/hook/update-lane-description
 
 Runs **just before a lane is archived or deleted** — while the lane folder still exists — so it can tear down the windows the lane opened. Closing the lane's **Fork** window first also stops Fork throwing a pop-up per `.git` file as the clone is removed.
 
-It receives `LANE_DIR` / `LANE_NAME` / `LANE_ID` and, when a ticket is linked, `TICKET_KEY` / `TICKET_URL`. Its output is ignored, and any failure (or a missing/non-executable hook) is a no-op — the archive/delete always proceeds. It runs synchronously, so keep it quick; the shipped example time-boxes each AppleScript call.
+It receives `LANE_DIR` / `LANE_NAME` / `LANE_ID` and, when a ticket is linked, `TICKET_KEY` / `TICKET_URL`. Its output is ignored, and any failure (or a missing/non-executable hook) is a no-op — the archive/delete always proceeds. It runs synchronously, so keep it quick and time-box any AppleScript call so a wedged app can't stall the action.
 
-A ready-made example lives at [`doc/examples/cleanup`](examples/cleanup). Copy it in and make it executable:
-
-```sh
-cp doc/examples/cleanup .lanes/config/hook/cleanup
-chmod +x .lanes/config/hook/cleanup
-```
-
+The easiest way to get one is the **default catalog**: enable its **"Close lane windows"** cleanup hook from **Settings → Catalogs → [Hooks](#catalogs)**.
 It closes, best-effort:
 
 - **iTerm2 + Claude** — the sessions this lane opened (Lanes tags them with a `user.lane` variable; Claude runs inside them). *Automation permission.*
 - **Ghostty + Claude** — the tabs whose terminal is at (or under) the lane dir; Ghostty reports each surface's working directory, so no tagging is needed and only the lane's own tab is closed. *Automation permission.*
 - **Chrome tabs** — tabs whose URL contains the lane's `TICKET_KEY`. *Automation permission.*
 - **Fork / VS Code** — windows whose title contains the lane or repo folder name. *Needs **Accessibility** permission: System Settings → Privacy & Security → Accessibility → enable Lanes.* Without it, these two are simply skipped; iTerm/Chrome still work.
+
+To roll your own instead, a minimal local example (just the iTerm2 block) lives at [`doc/examples/cleanup`](examples/cleanup):
+
+```sh
+cp doc/examples/cleanup .lanes/config/hook/cleanup
+chmod +x .lanes/config/hook/cleanup
+```
 
 ---
 
