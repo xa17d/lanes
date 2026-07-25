@@ -9,7 +9,8 @@
 //
 //  Selecting a repo clones it into the lane (hybrid: a `clone-repo` handler if
 //  configured, else `git clone`) and re-enters the lane so the new repo shows.
-//  A secondary "Add repo to list…" action seeds a URL you have not cloned yet.
+//  A "Clone from URL…" action pastes a URL and clones it right away; the list
+//  fills itself from what you actually clone (no separate "add to list" step).
 //
 
 import Foundation
@@ -29,12 +30,12 @@ nonisolated struct CloneRepoProvider: LaneProvider {
             icon: .repo,
             keywords: ["clone", "repo", "git", "checkout"],
             childrenProvider: {
-                // Read the registry live so an "Add repo…" (or a fresh clone)
-                // shows up when this level is reloaded.
+                // Read the registry live so a freshly cloned repo shows up when
+                // this level is reloaded.
                 var kids: [any Item] = registry.known().map { repo in
                     Self.repoItem(repo, lane: lane, root: root, cloner: cloner, registry: registry)
                 }
-                kids.append(Self.addItem(lane: lane, root: root, registry: registry))
+                kids.append(Self.cloneFromURLItem(lane: lane, root: root, cloner: cloner, registry: registry))
                 return kids
             }
         )
@@ -59,41 +60,47 @@ nonisolated struct CloneRepoProvider: LaneProvider {
             subtitle: subtitle,
             icon: .repo,
             keywords: ["clone", "repo", "git", repo.owner, repo.host].compactMap { $0 },
+            run: { try performClone(repo, lane: lane, root: root, cloner: cloner, registry: registry) }
+        )
+    }
+
+    private static func cloneFromURLItem(lane: Lane, root: URL,
+                                         cloner: RepoCloner, registry: RepoRegistry) -> any Item {
+        BasicItem(
+            id: "clone:from-url",
+            title: "Clone from URL…",
+            icon: .add,
+            keywords: ["clone", "url", "ssh", "https", "git", "new", "paste"],
+            isSecondary: true,
             run: {
-                let outcome = try cloner.clone(repo, into: lane, root: root)
-                registry.remember(url: repo.url)   // bump recency
-                // Re-enter the lane either way so the new repo lists; a non-fatal
-                // warning is surfaced but never blocks the refresh.
-                switch outcome {
-                case .cloned:
-                    return .enter(lane)
-                case .clonedWithWarnings(let stderr):
-                    let detail = stderr.isEmpty ? "" : "\n\(stderr)"
-                    return .enterWithNotice(lane, notice: "Cloned “\(repo.name)” with warnings.\(detail)")
-                }
+                .pushInput(InputRequest(title: "Clone repo",
+                                        placeholder: "Clone URL (git@… or https://…)") { input in
+                    let url = input.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !url.isEmpty else { throw InputError(message: "Enter a clone URL.") }
+                    guard let repo = RepoRegistry.makeRepo(url: url, now: Date()) else {
+                        throw InputError(message: "Not a recognizable clone URL.")
+                    }
+                    // Clone right away; `remember` (inside performClone) adds it to
+                    // the list, so next time it's a one-tap entry.
+                    return try performClone(repo, lane: lane, root: root, cloner: cloner, registry: registry)
+                })
             }
         )
     }
 
-    private static func addItem(lane: Lane, root: URL, registry: RepoRegistry) -> any Item {
-        BasicItem(
-            id: "clone:add",
-            title: "Add repo to list…",
-            icon: .add,
-            keywords: ["add", "clone", "repo", "url"],
-            isSecondary: true,
-            run: {
-                .pushInput(InputRequest(title: "Add repo",
-                                        placeholder: "Clone URL (git@… or https://…)") { input in
-                    let url = input.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !url.isEmpty else { throw InputError(message: "Enter a clone URL.") }
-                    guard RepoRegistry.makeRepo(url: url, now: Date()) != nil else {
-                        throw InputError(message: "Not a recognizable clone URL.")
-                    }
-                    registry.remember(url: url)
-                    return .pop   // back to the "Clone repo…" list, now including it
-                })
-            }
-        )
+    /// Clone `repo` into `lane`, record it in the known-repos list, and re-enter
+    /// the lane so the new repo shows. A non-fatal warning (a non-zero exit that
+    /// still produced the repo) is surfaced but never blocks the refresh.
+    private static func performClone(_ repo: KnownRepo, lane: Lane, root: URL,
+                                     cloner: RepoCloner, registry: RepoRegistry) throws -> RunOutcome {
+        let outcome = try cloner.clone(repo, into: lane, root: root)
+        registry.remember(url: repo.url)
+        switch outcome {
+        case .cloned:
+            return .enter(lane)
+        case .clonedWithWarnings(let stderr):
+            let detail = stderr.isEmpty ? "" : "\n\(stderr)"
+            return .enterWithNotice(lane, notice: "Cloned “\(repo.name)” with warnings.\(detail)")
+        }
     }
 }

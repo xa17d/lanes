@@ -132,10 +132,10 @@ Inside a lane, **Clone repo…** lets you search a repo you've cloned before and
 
 **The list fills itself.** Every repo Lanes discovers in any lane under this root is recorded (by its `origin` URL) in `.lanes/repos.json`, so once you've cloned a repo through Lanes it's in the list for every future lane.
 The ssh and https forms of the same repo collapse into one entry.
-You can also seed a repo you haven't cloned yet with **Add repo to list…** (paste a clone URL), and remove stale ones.
+For a repo that isn't in the list yet, use **Clone from URL…**: paste a clone URL (ssh or https) and it clones right away, then the repo is added to the list automatically for next time.
 Because the list is indexed like everything else, typing a repo name from the lane's top level jumps straight to it (`Clone repo… › my-service`).
 
-Selecting a repo clones it into `<lane>/<repo-name>`; an existing folder of that name is an error (Lanes never overwrites).
+Selecting a repo (or cloning from a URL) clones it into `<lane>/<repo-name>`; an existing folder of that name is an error (Lanes never overwrites).
 
 ### Custom clone handler (optional)
 
