@@ -43,6 +43,12 @@ xcodebuild -project Lanes.xcodeproj -scheme Lanes -configuration Debug \
 LANES_ROOT=/tmp/lanes LANES_AUTOSHOW=1 ./.build/Build/Products/Debug/Lanes.app/Contents/MacOS/Lanes
 ```
 
+**Shared UserDefaults — always launch smoke tests with `LANES_ROOT`.**
+The built binary uses the same bundle id (`at.xa1.lanes`) as the user's installed app, so `UserDefaults.standard` (`rootPath`, `defaultCatalogSeededRoots`, `ticketBaseURL`, …) is **shared with their real Lanes**.
+`LANES_ROOT` is applied in-memory only and *locks* the root (`LaneLibrary.lockRoot`, `isRootLocked`): while locked nothing is persisted and the Settings picker is disabled, so a test run can't overwrite the user's configured root.
+Therefore **never launch the app for a test without `LANES_ROOT`** (an unlocked launch reads/writes the user's real root and can seed catalogs into it).
+If you ever must run unlocked, snapshot `defaults read at.xa1.lanes rootPath` first and restore it (and de-pollute `defaultCatalogSeededRoots`) afterward.
+
 `xcodebuild` needs the sandbox disabled (its daemon writes outside any allowed path).
 `.build/` is gitignored.
 The one SPM dependency (KeyboardShortcuts) resolves on first build.

@@ -15,6 +15,11 @@ final class LaneLibrary: ObservableObject {
 
     @Published private(set) var root: URL?
 
+    /// True when the root came from the `LANES_ROOT` dev/test override. While
+    /// locked the root is **not** persisted and `setRoot` is a no-op, so a test
+    /// run can never overwrite the user's stored root.
+    private(set) var isRootLocked = false
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         if let path = defaults.string(forKey: Self.rootDefaultsKey) {
@@ -25,8 +30,16 @@ final class LaneLibrary: ObservableObject {
     private let defaults: UserDefaults
 
     func setRoot(_ url: URL) {
+        guard !isRootLocked else { return }   // env override in effect: don't touch stored root
         root = url
         defaults.set(url.path, forKey: Self.rootDefaultsKey)
+    }
+
+    /// Apply an in-memory-only root (the `LANES_ROOT` dev/test override) and lock
+    /// it, so nothing written this session persists to `UserDefaults`.
+    func lockRoot(to url: URL) {
+        root = url
+        isRootLocked = true
     }
 
     // MARK: - CRUD (thin wrappers over LaneFS)

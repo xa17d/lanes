@@ -83,8 +83,11 @@ struct SettingsView: View {
                         .truncationMode(.middle)
                     Spacer()
                     Button("Choose…") { chooseRoot() }
+                        .disabled(library.isRootLocked)
                 }
-                Text("Every visible folder inside the root is a lane.")
+                Text(library.isRootLocked
+                     ? "Root set by the LANES_ROOT override (dev/test) — not persisted."
+                     : "Every visible folder inside the root is a lane.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

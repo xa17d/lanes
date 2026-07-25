@@ -20,10 +20,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         // Dev/test override: LANES_ROOT points the library at a folder without
-        // having to configure it in Settings.
+        // having to configure it in Settings. It is applied in-memory only (and
+        // locks the root) so a test run never overwrites the user's stored root.
         let rootOverride = ProcessInfo.processInfo.environment["LANES_ROOT"]
         if let rootOverride {
-            core.library.setRoot(URL(fileURLWithPath: rootOverride, isDirectory: true))
+            core.library.lockRoot(to: URL(fileURLWithPath: rootOverride, isDirectory: true))
         }
         core.model.onOpenSettings = { AppDelegate.openSettings() }
         core.model.onOpenCatalogSettings = { AppDelegate.openSettings(pane: .catalogs) }
