@@ -60,9 +60,17 @@ nonisolated struct CloneRepoProvider: LaneProvider {
             icon: .repo,
             keywords: ["clone", "repo", "git", repo.owner, repo.host].compactMap { $0 },
             run: {
-                try cloner.clone(repo, into: lane, root: root)
+                let outcome = try cloner.clone(repo, into: lane, root: root)
                 registry.remember(url: repo.url)   // bump recency
-                return .enter(lane)                // re-enter so the new repo lists
+                // Re-enter the lane either way so the new repo lists; a non-fatal
+                // warning is surfaced but never blocks the refresh.
+                switch outcome {
+                case .cloned:
+                    return .enter(lane)
+                case .clonedWithWarnings(let stderr):
+                    let detail = stderr.isEmpty ? "" : "\n\(stderr)"
+                    return .enterWithNotice(lane, notice: "Cloned “\(repo.name)” with warnings.\(detail)")
+                }
             }
         )
     }

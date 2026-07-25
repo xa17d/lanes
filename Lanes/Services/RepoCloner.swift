@@ -15,9 +15,23 @@ nonisolated struct RepoCloner: Sendable {
     let shell: Shell
     private static let gitPath = "/usr/bin/git"
 
-    /// Clone `repo` into `lane`. Runs synchronously (blocks until git exits), so
-    /// call it off the main actor; a nonzero exit throws with stderr for a toast.
-    func clone(_ repo: KnownRepo, into lane: Lane, root: URL) throws {
+    nonisolated enum Outcome: Sendable {
+        case cloned
+        /// The clone command exited non-zero but still produced the repo (e.g.
+        /// macOS checkout warnings for case/long-path conflicts, or a failing
+        /// post-clone step). The repo is usable; `stderr` is the warning text.
+        case clonedWithWarnings(String)
+    }
+
+    /// Clone `repo` into `<lane>/<repo.name>`. Runs synchronously (blocks until
+    /// the clone exits), so call it off the main actor.
+    ///
+    /// A non-zero exit that **still produced the repo** is reported as
+    /// `.clonedWithWarnings` rather than thrown — on macOS `git clone` commonly
+    /// exits non-zero on checkout warnings while the repo is fully cloned, and
+    /// the caller must still refresh the lane so the new repo shows. Only a
+    /// clone that produced no repo (or a pre-existing destination) throws.
+    func clone(_ repo: KnownRepo, into lane: Lane, root: URL) throws -> Outcome {
         let dest = lane.url.appendingPathComponent(repo.name)
         guard !FileManager.default.fileExists(atPath: dest.path) else {
             throw InputError(message: "“\(repo.name)” already exists in this lane.")
@@ -29,10 +43,18 @@ nonisolated struct RepoCloner: Sendable {
             "REPO_URL": repo.url,
             "REPO_NAME": repo.name,
         ]
-        if let handler = Self.handler(root: root) {
-            try shell.run(handler.path, [], cwd: lane.url, env: env)
-        } else {
-            try shell.run(Self.gitPath, ["clone", "--", repo.url, repo.name], cwd: lane.url, env: env)
+        do {
+            if let handler = Self.handler(root: root) {
+                try shell.run(handler.path, [], cwd: lane.url, env: env)
+            } else {
+                try shell.run(Self.gitPath, ["clone", "--", repo.url, repo.name], cwd: lane.url, env: env)
+            }
+            return .cloned
+        } catch let ShellError.nonzeroExit(status, stderr) {
+            let created = FileManager.default.fileExists(
+                atPath: dest.appendingPathComponent(".git").path)
+            guard created else { throw ShellError.nonzeroExit(status: status, stderr: stderr) }
+            return .clonedWithWarnings(stderr)
         }
     }
 

@@ -378,6 +378,9 @@ final class LaneModel: ObservableObject {
             reloadLanes()
         case .enter(let lane):
             enter(lane: lane)
+        case .enterWithNotice(let lane, let notice):
+            enter(lane: lane)
+            showToast(notice, kind: .error)
         case .pushInput(let request):
             pushInput(request, seed: seed)
         case .pushItems(let title, let items):
