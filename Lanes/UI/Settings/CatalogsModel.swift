@@ -294,16 +294,11 @@ nonisolated enum ConfigEdits {
         return ext.isEmpty ? base : "\(base).\(ext)"
     }
 
-    /// `<order>---<icon>---<name>.catalog` → (order, icon, name); mirrors
-    /// `ScriptItems.parse` for the display fields.
+    /// `<order>---<icon>---<name>.catalog` → (order, icon, name), applying the
+    /// editor's defaults (order 0, `scroll` icon) over the shared parser.
     private static func parseFilename(_ url: URL) -> (order: Int, icon: String, name: String) {
-        let base = (url.lastPathComponent as NSString).deletingPathExtension
-        let parts = base.components(separatedBy: "---")
-        guard parts.count >= 3 else { return (0, defaultIcon, base) }
-        let order = Int(parts[0].trimmingCharacters(in: .whitespaces)) ?? 0
-        let icon = parts[1].trimmingCharacters(in: .whitespaces)
-        let name = parts[2...].joined(separator: "---").trimmingCharacters(in: .whitespaces)
-        return (order, icon.isEmpty ? defaultIcon : icon, name.isEmpty ? base : name)
+        let parsed = ScriptFilename.parse(url)
+        return (parsed.order ?? 0, parsed.icon ?? defaultIcon, parsed.name)
     }
 }
 

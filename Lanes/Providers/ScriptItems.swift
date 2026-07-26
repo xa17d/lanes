@@ -83,22 +83,12 @@ nonisolated struct ScriptItems: Sendable {
     ///
     /// `icon` sits before `name` (and the extension is mandatory) so a dotted
     /// SF Symbol name like `bolt.fill` can never be mistaken for the extension.
-    /// The extension is removed first, then the base is split on `---`. A file
-    /// that doesn't match (fewer than three fields) falls back to showing its
-    /// whole base name with the default scroll icon.
+    /// A file that doesn't match (fewer than three fields) falls back to showing
+    /// its whole base name with the default scroll icon. Parsing itself lives in
+    /// `ScriptFilename`; here we map the icon field to an `IconToken`.
     static func parse(_ url: URL) -> (title: String, icon: IconToken) {
-        let base = (url.lastPathComponent as NSString).deletingPathExtension
-        let parts = base.components(separatedBy: "---")
-        guard parts.count >= 3 else {
-            let fallback = base.trimmingCharacters(in: .whitespaces)
-            return (fallback.isEmpty ? url.lastPathComponent : fallback, .script)
-        }
-        let iconName = parts[1].trimmingCharacters(in: .whitespaces)
-        // Tolerate `---` inside the name by joining the trailing fields back.
-        let name = parts[2...].joined(separator: "---")
-            .trimmingCharacters(in: .whitespaces)
-        return (name.isEmpty ? url.lastPathComponent : name,
-                iconName.isEmpty ? .script : .custom(iconName))
+        let parsed = ScriptFilename.parse(url)
+        return (parsed.name, parsed.icon.map(IconToken.custom) ?? .script)
     }
 
     static func title(for url: URL) -> String { parse(url).title }
