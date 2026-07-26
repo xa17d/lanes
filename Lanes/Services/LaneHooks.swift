@@ -124,14 +124,10 @@ nonisolated struct LaneHooks: Sendable {
     /// neither is present/runnable.
     private func hookURL(_ name: String, root: URL) -> URL? {
         let dir = LaneFS.hookDir(in: root)
-        let fm = FileManager.default
-        let pointer = dir.appendingPathComponent("\(name).\(Catalogs.pointerExtension)")
-        if fm.fileExists(atPath: pointer.path),
-           let target = Catalogs.resolveExecutable(at: pointer, root: root) {
-            return target
-        }
-        let local = dir.appendingPathComponent(name)
-        return local.isExecutableRegularFile ? local : nil
+        return Catalogs.resolveSingleton(
+            localFile: dir.appendingPathComponent(name),
+            pointer: dir.appendingPathComponent("\(name).\(Catalogs.pointerExtension)"),
+            root: root)
     }
 
     /// Whether hook `name` resolves to a runnable executable.

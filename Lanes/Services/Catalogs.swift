@@ -149,6 +149,18 @@ nonisolated enum Catalogs {
         resolveItemFolder(at: url, root: root).flatMap(executable(inItem:))
     }
 
+    /// The effective executable for a **singleton** config slot (a hook, the
+    /// clone-repo handler): a `.catalog` `pointer` that resolves to an executable
+    /// wins over a local executable `localFile`; delete the pointer to fall back
+    /// to the local file. nil when neither resolves to a runnable executable.
+    static func resolveSingleton(localFile: URL, pointer: URL, root: URL) -> URL? {
+        if fm.fileExists(atPath: pointer.path),
+           let target = resolveExecutable(at: pointer, root: root) {
+            return target
+        }
+        return localFile.isExecutableRegularFile ? localFile : nil
+    }
+
     /// The executable payload in an item folder: the single executable regular
     /// file (the non-executable `lanes-item.json` companion is excluded).
     static func executable(inItem folder: URL) -> URL? {

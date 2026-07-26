@@ -60,13 +60,9 @@ nonisolated struct RepoCloner: Sendable {
     /// the resolved target must be an executable regular file. nil when neither
     /// is present/runnable, meaning the built-in `git clone` is used.
     static func handler(root: URL) -> URL? {
-        let fm = FileManager.default
-        let pointer = LaneFS.cloneScriptPointer(in: root)
-        if fm.fileExists(atPath: pointer.path),
-           let target = Catalogs.resolveExecutable(at: pointer, root: root) {
-            return target
-        }
-        let local = LaneFS.cloneScript(in: root)
-        return local.isExecutableRegularFile ? local : nil
+        Catalogs.resolveSingleton(
+            localFile: LaneFS.cloneScript(in: root),
+            pointer: LaneFS.cloneScriptPointer(in: root),
+            root: root)
     }
 }
