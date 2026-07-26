@@ -35,6 +35,10 @@ protocol Item: Identifiable, Sendable {
     nonisolated var sortKey: String { get }
     nonisolated var run: (@Sendable () async throws -> RunOutcome)? { get }
     nonisolated func children() async -> [any Item]
+    /// For a container: when the user searches inside it and nothing matches,
+    /// build a fallback action from the query (e.g. "Clone repo…" turns an
+    /// unmatched query — a pasted clone URL — into a clone). nil = no fallback.
+    nonisolated var queryFallback: (@Sendable (String) -> (any Item)?)? { get }
 }
 
 extension Item {
@@ -45,6 +49,7 @@ extension Item {
     var sortKey: String { title }
     var run: (@Sendable () async throws -> RunOutcome)? { nil }
     func children() async -> [any Item] { [] }
+    var queryFallback: (@Sendable (String) -> (any Item)?)? { nil }
 }
 
 /// The one concrete type providers construct.
@@ -59,6 +64,7 @@ nonisolated struct BasicItem: Item {
     var sortValue: String? = nil
     var run: (@Sendable () async throws -> RunOutcome)? = nil
     var childrenProvider: @Sendable () async -> [any Item] = { [] }
+    var queryFallback: (@Sendable (String) -> (any Item)?)? = nil
 
     var sortKey: String { sortValue ?? title }
     func children() async -> [any Item] { await childrenProvider() }

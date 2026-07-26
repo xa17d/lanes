@@ -9,8 +9,9 @@
 //
 //  Selecting a repo clones it into the lane (hybrid: a `clone-repo` handler if
 //  configured, else `git clone`) and re-enters the lane so the new repo shows.
-//  A "Clone from URL…" action pastes a URL and clones it right away; the list
-//  fills itself from what you actually clone (no separate "add to list" step).
+//  The search field doubles as a URL field: a query that matches no known repo
+//  but parses as a clone URL becomes a "Clone <repo>" action (via the level's
+//  queryFallback), so the list fills itself purely from what you actually clone.
 //
 
 import Foundation
@@ -27,16 +28,31 @@ nonisolated struct CloneRepoProvider: LaneProvider {
         let container = BasicItem(
             id: "clone:container",
             title: "Clone repo…",
+            subtitle: "Search a known repo, or paste a clone URL",
             icon: .repo,
             keywords: ["clone", "repo", "git", "checkout"],
             childrenProvider: {
                 // Read the registry live so a freshly cloned repo shows up when
                 // this level is reloaded.
-                var kids: [any Item] = registry.known().map { repo in
+                registry.known().map { repo in
                     Self.repoItem(repo, lane: lane, root: root, cloner: cloner, registry: registry)
                 }
-                kids.append(Self.cloneFromURLItem(lane: lane, root: root, cloner: cloner, registry: registry))
-                return kids
+            },
+            // The search field doubles as a URL field: an unmatched query that
+            // looks like a clone target (a URL or path — not a bare-word typo)
+            // becomes a one-shot "Clone <repo>" action.
+            queryFallback: { raw in
+                let q = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard Self.looksLikeCloneTarget(q),
+                      let repo = RepoRegistry.makeRepo(url: q, now: Date()) else { return nil }
+                return BasicItem(
+                    id: "clone:url",
+                    title: "Clone \(repo.name)",
+                    subtitle: q,
+                    icon: .add,
+                    keywords: ["clone", "url"],
+                    run: { try Self.performClone(repo, lane: lane, root: root, cloner: cloner, registry: registry) }
+                )
             }
         )
         return [container]
@@ -64,28 +80,13 @@ nonisolated struct CloneRepoProvider: LaneProvider {
         )
     }
 
-    private static func cloneFromURLItem(lane: Lane, root: URL,
-                                         cloner: RepoCloner, registry: RepoRegistry) -> any Item {
-        BasicItem(
-            id: "clone:from-url",
-            title: "Clone from URL…",
-            icon: .add,
-            keywords: ["clone", "url", "ssh", "https", "git", "new", "paste"],
-            isSecondary: true,
-            run: {
-                .pushInput(InputRequest(title: "Clone repo",
-                                        placeholder: "Clone URL (git@… or https://…)") { input in
-                    let url = input.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !url.isEmpty else { throw InputError(message: "Enter a clone URL.") }
-                    guard let repo = RepoRegistry.makeRepo(url: url, now: Date()) else {
-                        throw InputError(message: "Not a recognizable clone URL.")
-                    }
-                    // Clone right away; `remember` (inside performClone) adds it to
-                    // the list, so next time it's a one-tap entry.
-                    return try performClone(repo, lane: lane, root: root, cloner: cloner, registry: registry)
-                })
-            }
-        )
+    /// Whether a query looks like something to clone (a URL or a path) rather
+    /// than a bare-word repo-name search that simply didn't match — so a typo
+    /// like "widgt" never becomes a clone offer, but `git@…`, `https://…`,
+    /// `host:owner/repo`, and `/local/path` do.
+    static func looksLikeCloneTarget(_ q: String) -> Bool {
+        guard !q.isEmpty else { return false }
+        return q.contains("/") || q.contains(":") || q.contains("@")
     }
 
     /// Clone `repo` into `lane`, record it in the known-repos list, and re-enter

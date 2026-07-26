@@ -209,6 +209,12 @@ final class LaneModel: ObservableObject {
             return level.items.map { DisplayRow(item: $0, pathLabels: []) }
         }
         let hits = SubtreeIndex.search(level.index, query: query)
+        // If nothing matched, let the container turn the query into an action
+        // (e.g. "Clone repo…" clones a pasted URL). A short/typo query yields no
+        // fallback, so this only fires for a recognizable URL.
+        if hits.isEmpty, let fallback = level.queryFallback, let item = fallback(query) {
+            return [DisplayRow(item: item, pathLabels: [])]
+        }
         return hits.map { DisplayRow(item: $0.item, pathLabels: $0.breadcrumb) }
     }
 
@@ -249,6 +255,12 @@ final class LaneModel: ObservableObject {
         case .lane(let t): enter(lane: t)
         case .item(let item): activate(item: item)
         }
+    }
+
+    /// ⌃U: clear the active text field (the search query, or the input field in
+    /// input mode) — like clearing the line in a terminal.
+    func clearField() {
+        if isInputMode { inputText = "" } else { query = "" }
     }
 
     func escape() {
@@ -433,6 +445,7 @@ final class LaneModel: ObservableObject {
         level.sourceItem = item
         level.lane = currentLane
         level.isLoading = true
+        level.queryFallback = item.queryFallback
         stack.append(level)
         query = ""
         selection = 0
@@ -568,6 +581,9 @@ struct LevelState: Identifiable {
     var indexBuilt = false
     var isLoading = false
     var loadToken = UUID()
+    /// Fallback action for a non-matching query (from the container item), e.g.
+    /// "Clone repo…" turning a pasted URL into a clone.
+    var queryFallback: (@Sendable (String) -> (any Item)?)? = nil
 }
 
 struct DisplayRow: Identifiable {

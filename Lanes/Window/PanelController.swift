@@ -86,6 +86,13 @@ final class PanelController {
     private func handle(_ event: NSEvent) -> Bool {
         guard panel?.isKeyWindow == true else { return false }
 
+        // ⌃U clears the text field (search or input), like a terminal line kill.
+        if event.modifierFlags.contains(.control),
+           !event.modifierFlags.contains(.command),
+           event.charactersIgnoringModifiers?.lowercased() == "u" {
+            model.clearField(); return true
+        }
+
         if event.modifierFlags.contains(.command) {
             switch event.charactersIgnoringModifiers {
             case "w": model.onClose(); return true   // close from any depth (Esc only steps back)
