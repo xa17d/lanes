@@ -29,7 +29,7 @@ nonisolated enum CloneRepo {
         return BasicItem(
             id: "clone:container",
             title: "Clone repo…",
-            subtitle: "Search a known repo, or paste a clone URL",
+            subtitle: "Search a known repo, or paste a clone URL (⇧Return queues several)",
             icon: .clone,
             keywords: ["clone", "repo", "git", "checkout"],
             isSecondary: true,

@@ -243,16 +243,19 @@ final class LaneModel: ObservableObject {
     }
 
     /// Return / Enter. Submits in input mode, else activates the selection.
-    func confirm() {
+    /// `stayInMenu` (⇧Return) keeps the current level open after a `.startClone`
+    /// so several repos can be queued from the clone menu without navigating
+    /// back into the lane; it's inert for every other action.
+    func confirm(stayInMenu: Bool = false) {
         if isInputMode { submitInput(); return }
-        activateSelected()
+        activateSelected(stayInMenu: stayInMenu)
     }
 
-    func activateSelected() {
+    func activateSelected(stayInMenu: Bool = false) {
         guard let row = selectedRow else { return }
         switch row.payload {
         case .lane(let t): enter(lane: t)
-        case .item(let item): activate(item: item)
+        case .item(let item): activate(item: item, stayInMenu: stayInMenu)
         }
     }
 
@@ -366,15 +369,19 @@ final class LaneModel: ObservableObject {
     /// completion drops the job, surfaces any warning/error, and reloads the lane
     /// in place if it's the one on screen — so several clones can run at once
     /// without ever blocking the panel.
-    func startClone(url: String, into lane: Lane) {
+    /// Starts a background clone, returning the repo name when a job was
+    /// actually enqueued or nil when it was skipped (bad URL, already present,
+    /// or the same clone is already running) so callers can confirm accordingly.
+    @discardableResult
+    func startClone(url: String, into lane: Lane) -> String? {
         guard let repo = RepoRegistry.makeRepo(url: url, now: Date()) else {
-            showToast("Not a recognizable clone URL.", kind: .error); return
+            showToast("Not a recognizable clone URL.", kind: .error); return nil
         }
         // Skip if the destination already exists or the same clone is running.
         if FileManager.default.fileExists(atPath: lane.url.appendingPathComponent(repo.name).path) {
-            showToast("“\(repo.name)” already exists in this lane.", kind: .error); return
+            showToast("“\(repo.name)” already exists in this lane.", kind: .error); return nil
         }
-        if activeClones.contains(where: { $0.laneID == lane.id && $0.name == repo.name }) { return }
+        if activeClones.contains(where: { $0.laneID == lane.id && $0.name == repo.name }) { return nil }
 
         let job = CloneJob(laneID: lane.id, name: repo.name)
         activeClones.append(job)
@@ -392,6 +399,7 @@ final class LaneModel: ObservableObject {
             }
             await self.finishClone(job, name: repo.name, warning: warning, failure: failure)
         }
+        return repo.name
     }
 
     private func finishClone(_ job: CloneJob, name: String, warning: String?, failure: String?) {
@@ -422,7 +430,7 @@ final class LaneModel: ObservableObject {
             }
     }
 
-    private func activate(item: any Item) {
+    private func activate(item: any Item, stayInMenu: Bool = false) {
         if let run = item.run {
             guard !isRunningAction else { return }   // ignore re-entry while one runs
             // For "New lane…", seed the name field with the current query so
@@ -433,7 +441,7 @@ final class LaneModel: ObservableObject {
                 defer { isRunningAction = false }
                 // Run off the main actor so a slow script (Shell.run blocks until
                 // exit) doesn't freeze the panel and the spinner can animate.
-                do { honor(try await Task.detached(priority: .userInitiated) { try await run() }.value, seed: seed) }
+                do { honor(try await Task.detached(priority: .userInitiated) { try await run() }.value, seed: seed, stayInMenu: stayInMenu) }
                 catch { showToast(error.localizedDescription, kind: .error) }
             }
         } else {
@@ -452,7 +460,7 @@ final class LaneModel: ObservableObject {
         }
     }
 
-    private func honor(_ outcome: RunOutcome, seed: String? = nil) {
+    private func honor(_ outcome: RunOutcome, seed: String? = nil, stayInMenu: Bool = false) {
         switch outcome {
         case .dismiss:
             onClose()
@@ -472,8 +480,19 @@ final class LaneModel: ObservableObject {
             enter(lane: lane)
             showToast(notice, kind: .error)
         case .startClone(let lane, let url):
-            startClone(url: url, into: lane)   // background; returns to the lane below
-            enter(lane: lane)
+            let startedName = startClone(url: url, into: lane)   // background
+            if stayInMenu {
+                // ⇧Return: keep the clone menu open so several repos can be
+                // queued back-to-back. No spinner shows at this depth (spinners
+                // overlay only the lane's top level), so confirm with a toast;
+                // clear the query and refresh so a typed URL resets and a
+                // re-clone target's "already in this lane" note updates.
+                if let startedName { showToast("Cloning “\(startedName)”…") }
+                query = ""
+                reloadCurrentInPlace()
+            } else {
+                enter(lane: lane)   // return to the lane; a spinner row tracks it
+            }
         case .pushInput(let request):
             pushInput(request, seed: seed)
         case .pushItems(let title, let items):

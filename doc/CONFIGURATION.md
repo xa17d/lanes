@@ -128,13 +128,15 @@ chmod +x ".lanes/config/script/repository/10---arrow.triangle.2.circlepath---fet
 
 ## Cloning repos
 
-Inside a lane, **Clone repo…** lets you search a repo you've cloned before and clone it into the current lane - handy when a fresh lane needs the same repos as your other work.
+Inside a lane, **Manage lane… → Clone repo…** lets you search a repo you've cloned before and clone it into the current lane - handy when a fresh lane needs the same repos as your other work.
 
 **The search field doubles as a URL field.** Type to filter the repos you already know; if the query matches nothing but looks like a clone URL or path (`git@…`, `https://…`, `/local/path`), pressing Return clones it. There's no separate "add to list" step - the list fills itself from what you actually clone.
 
+**Return clones and returns to the lane; ⇧Return clones without leaving.** Clones run in the background, so ⇧Return lets you queue several repos back-to-back from the clone menu (each one confirmed with a brief toast) instead of reopening the menu for each.
+
 **The list fills itself.** Every repo Lanes discovers in any lane under this root is recorded (by its `origin` URL) in `.lanes/repos.json`, so once you've cloned a repo through Lanes it's a one-tap entry for every future lane.
 The ssh and https forms of the same repo collapse into one entry.
-Because the list is indexed like everything else, typing a repo name from the lane's top level jumps straight to it (`Clone repo… › my-service`).
+Because the list is indexed like everything else, typing a repo name from the lane's top level jumps straight to it (`Manage lane… › Clone repo… › my-service`).
 
 Cloning (whether from the list or a pasted URL) drops the repo into `<lane>/<repo-name>`; an existing folder of that name is an error (Lanes never overwrites).
 Clones run **in the background**: you're returned to the lane immediately and the new repo shows a spinner until it's ready, so you can kick off several at once without waiting.

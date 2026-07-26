@@ -118,7 +118,10 @@ final class PanelController {
         switch event.keyCode {
         case 125: model.moveSelection(1);  return true   // ↓
         case 126: model.moveSelection(-1); return true   // ↑
-        case 36, 76: model.confirm(); return true        // return / enter
+        case 36, 76:                                     // return / enter
+            // ⇧Return keeps the clone menu open so several repos can be queued
+            // in a row; plain Return activates normally.
+            model.confirm(stayInMenu: event.modifierFlags.contains(.shift)); return true
         case 53: model.escape(); return true             // esc
         case 124:                                        // → drill in
             // Drill when there's no text to move through, or when the caret is
