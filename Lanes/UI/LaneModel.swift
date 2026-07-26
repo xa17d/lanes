@@ -115,7 +115,7 @@ final class LaneModel: ObservableObject {
               DescriptionMarkup.parse(from: lane.summary).refresh != nil,
               !refreshingLaneIDs.contains(lane.id) else { return }
         refreshingLaneIDs.insert(lane.id)
-        let hooks = LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL)
+        let hooks = services.hooks
         Task.detached {
             let updated = hooks.refreshIfStale(lane, root: root)
             await MainActor.run {
@@ -200,7 +200,7 @@ final class LaneModel: ObservableObject {
         }
         // "New lane…" is always last.
         if let root = library.root {
-            let item = LaneActions.newLaneItem(root: root, hooks: LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL))
+            let item = LaneActions.newLaneItem(root: root, hooks: services.hooks)
             rows.append(DisplayRow(item: item, pathLabels: []))
         }
         return rows
@@ -286,7 +286,7 @@ final class LaneModel: ObservableObject {
         }
         // Carry whatever was typed in the search field into the name field as
         // a starting suggestion.
-        pushInput(LaneActions.newLaneRequest(root: root, hooks: LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL)), seed: query)
+        pushInput(LaneActions.newLaneRequest(root: root, hooks: services.hooks), seed: query)
     }
 
     func pop() {
@@ -328,7 +328,7 @@ final class LaneModel: ObservableObject {
         guard !isRefreshing else { return }
         guard let root = library.root else { reloadCurrent(); return }
         isRefreshing = true
-        let hooks = LaneHooks(shell: services.shell, baseURL: services.ticketBaseURL)
+        let hooks = services.hooks
         if stack.isEmpty {
             let targets = lanes
             Task.detached {

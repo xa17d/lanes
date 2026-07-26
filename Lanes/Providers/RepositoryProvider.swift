@@ -20,7 +20,7 @@ nonisolated struct RepositoryProvider: LaneProvider {
         // (read once, reused for every repo). The Open PR / Open Terminal here /
         // editor / Finder / CI actions all ship as drop-in examples there — see
         // examples/script/repository.
-        let scripts = ScriptItems(shell: services.shell)
+        let scripts = services.scripts
         let root = LaneActions.root(of: lane)
         let repoScripts = ScriptItems.effectiveScripts(
             in: LaneFS.repoScriptDir(in: root), root: root)

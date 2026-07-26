@@ -25,4 +25,11 @@ nonisolated struct Services: Sendable {
         self.apps = AppLauncher(shell: shell)
         self.ticketBaseURL = ticketBaseURL
     }
+
+    /// The lifecycle-hook runner, wired to this bundle's shell + ticket base URL
+    /// (so callers don't rebuild it — or re-thread `baseURL` — at every site).
+    var hooks: LaneHooks { LaneHooks(shell: shell, baseURL: ticketBaseURL) }
+
+    /// The custom-script runner, wired to this bundle's shell.
+    var scripts: ScriptItems { ScriptItems(shell: shell) }
 }
