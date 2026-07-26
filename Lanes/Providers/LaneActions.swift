@@ -38,20 +38,25 @@ nonisolated enum LaneActions {
 
     /// A single "Manage lane…" container drilling into the management actions,
     /// for use from *inside* an already-open lane (so "Open" is omitted).
-    static func manageLaneItem(for lane: Lane, apps: AppLauncher, hooks: LaneHooks) -> any Item {
+    static func manageLaneItem(for lane: Lane, store: LaneStore, apps: AppLauncher, hooks: LaneHooks) -> any Item {
         let root = root(of: lane)
         return BasicItem(id: "lane:manage", title: "Manage lane…", icon: .manage,
-                         keywords: ["manage", "rename", "archive", "delete", "settings"],
+                         keywords: ["manage", "clone", "repo", "ticket", "rename", "archive", "delete", "settings"],
                          isSecondary: true,
                          childrenProvider: {
-                             managementItems(for: lane, root: root, apps: apps, hooks: hooks)
+                             managementItems(for: lane, root: root, store: store, apps: apps, hooks: hooks)
                          })
     }
 
-    /// Rename / reveal / archive / delete for a lane. Shown from inside the
-    /// lane (via "Manage lane…"), so it does not include an "Open" action.
-    static func managementItems(for lane: Lane, root: URL, apps: AppLauncher, hooks: LaneHooks) -> [any Item] {
-        var items: [any Item] = []
+    /// Everything you can do *to* a lane, drilled into from "Manage lane…" so
+    /// the lane's top level holds only actual content: the "add stuff" actions
+    /// (clone a repo, link a ticket) followed by rename / reveal / archive /
+    /// delete. Shown from inside the lane, so it omits an "Open" action.
+    static func managementItems(for lane: Lane, root: URL, store: LaneStore, apps: AppLauncher, hooks: LaneHooks) -> [any Item] {
+        var items: [any Item] = [
+            CloneRepo.container(for: lane),
+            TicketProvider.linkTicketItem(store: store),
+        ]
 
         items.append(BasicItem(id: "mgmt:rename", title: "Rename…", icon: .rename,
                                run: {

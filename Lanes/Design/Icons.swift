@@ -12,6 +12,7 @@ nonisolated enum IconToken: Sendable, Hashable {
     case folder          // lane folder / finder
     case ticket
     case repo
+    case clone
     case pullRequest
     case ci
     case fork
@@ -39,6 +40,7 @@ nonisolated enum IconToken: Sendable, Hashable {
         case .folder:       return "folder"
         case .ticket:       return "tag"
         case .repo:         return "chevron.left.forwardslash.chevron.right"
+        case .clone:        return "square.and.arrow.down"
         case .pullRequest:  return "arrow.triangle.pull"
         case .ci:           return "checkmark.seal"
         case .fork:         return "arrow.triangle.branch"

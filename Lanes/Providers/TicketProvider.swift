@@ -2,8 +2,10 @@
 //  TicketProvider.swift
 //  Lanes
 //
-//  Section 0. One item per linked ticket (focus-or-open in Chrome) plus a
-//  trailing "Link ticket…" action. No ticket-tracker auth in v1.
+//  Section 0. One item per linked ticket (focus-or-open in Chrome). The
+//  "Link ticket…" action lives under "Manage lane…" (built by LaneActions) so
+//  the lane's top level holds only the actual tickets. No ticket-tracker auth
+//  in v1.
 //
 
 import Foundation
@@ -55,7 +57,7 @@ nonisolated struct TicketProvider: LaneProvider {
         let chrome = services.chrome
         let baseURL = services.ticketBaseURL
 
-        var items: [any Item] = links.map { link in
+        return links.map { link in
             let key = link.key
             let override = link.urlOverride
             return BasicItem(
@@ -73,16 +75,19 @@ nonisolated struct TicketProvider: LaneProvider {
                 }
             )
         }
+    }
 
-        items.append(BasicItem(
+    /// The "Link ticket…" action. Composed into "Manage lane…" (see
+    /// `LaneActions`) rather than shown at the lane's top level.
+    static func linkTicketItem(store: LaneStore) -> any Item {
+        BasicItem(
             id: "ticket:add",
             title: "Link ticket…",
             icon: .add,
             keywords: ["new", "link", "ticket"],
-            isSecondary: true,   // rank below the actual linked tickets
-            run: { .pushInput(Self.linkRequest(store: store)) }
-        ))
-        return items
+            isSecondary: true,
+            run: { .pushInput(linkRequest(store: store)) }
+        )
     }
 
     private static func linkRequest(store: LaneStore) -> InputRequest {

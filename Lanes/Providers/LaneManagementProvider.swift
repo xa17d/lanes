@@ -3,9 +3,10 @@
 //  Lanes
 //
 //  Last section. Surfaces a single "Manage lane…" container on a lane's own
-//  page, drilling one level deeper into the rename/reveal/archive/delete
-//  actions — so management lives alongside the lane's items (the → menu on the
-//  root list stays as a shortcut).
+//  page, drilling one level deeper into the clone-repo / link-ticket / rename /
+//  reveal / archive / delete actions — so the lane's top level holds only
+//  actual content and everything you do *to* the lane lives here (the → menu on
+//  the root list stays as a shortcut).
 //
 
 import Foundation
@@ -15,6 +16,6 @@ nonisolated struct LaneManagementProvider: LaneProvider {
     var displayName: String { "Manage" }
 
     func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
-        return [LaneActions.manageLaneItem(for: lane, apps: services.apps, hooks: services.hooks)]
+        return [LaneActions.manageLaneItem(for: lane, store: store, apps: services.apps, hooks: services.hooks)]
     }
 }

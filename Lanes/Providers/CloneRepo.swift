@@ -1,11 +1,13 @@
 //
-//  CloneRepoProvider.swift
+//  CloneRepo.swift
 //  Lanes
 //
-//  Section 2. A single "Clone repo…" container whose children are the root's
-//  known repos (RepoRegistry), so from inside a lane you can search a repo you
-//  cloned before and clone it here. Because SubtreeIndex indexes children, the
-//  repos are reachable by name straight from the lane's top level.
+//  A single "Clone repo…" container whose children are the root's known repos
+//  (RepoRegistry), so from inside a lane you can search a repo you cloned before
+//  and clone it here. It lives under "Manage lane…" (built by LaneActions), not
+//  as a top-level provider, so the lane's top level holds only actual content.
+//  Because SubtreeIndex indexes descendants, the repos stay reachable by name
+//  from the lane's top level even nested one level deeper.
 //
 //  Picking a repo (or the query fallback below) returns `.startClone`, which
 //  LaneModel runs as a background clone: the panel returns to the lane and shows
@@ -17,31 +19,31 @@
 
 import Foundation
 
-nonisolated struct CloneRepoProvider: LaneProvider {
-    let section = 2
-    var displayName: String { "Clone repo" }
-
-    func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
+nonisolated enum CloneRepo {
+    /// The "Clone repo…" container for a lane, built from the root's known-repo
+    /// registry. Composed into "Manage lane…" (see `LaneActions`).
+    static func container(for lane: Lane) -> any Item {
         let root = LaneActions.root(of: lane)
         let registry = RepoRegistry(root: root)
 
-        let container = BasicItem(
+        return BasicItem(
             id: "clone:container",
             title: "Clone repo…",
             subtitle: "Search a known repo, or paste a clone URL",
-            icon: .repo,
+            icon: .clone,
             keywords: ["clone", "repo", "git", "checkout"],
+            isSecondary: true,
             childrenProvider: {
                 // Read the registry live so a freshly cloned repo shows up when
                 // this level is reloaded.
-                registry.known().map { Self.repoItem($0, lane: lane) }
+                registry.known().map { repoItem($0, lane: lane) }
             },
             // The search field doubles as a URL field: an unmatched query that
             // looks like a clone target (a URL or path — not a bare-word typo)
             // becomes a one-shot "Clone <repo>" action.
             queryFallback: { raw in
                 let q = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard Self.looksLikeCloneTarget(q),
+                guard looksLikeCloneTarget(q),
                       let repo = RepoRegistry.makeRepo(url: q, now: Date()) else { return nil }
                 return BasicItem(
                     id: "clone:url",
@@ -53,7 +55,6 @@ nonisolated struct CloneRepoProvider: LaneProvider {
                 )
             }
         )
-        return [container]
     }
 
     // MARK: - Items
