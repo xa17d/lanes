@@ -79,7 +79,7 @@ Note `$TMPDIR` resolves differently inside vs outside the sandbox, so compile an
 This works because the model/service/provider layers are `nonisolated` and UI-free (`LaneModel` imports `Combine`, not `SwiftUI`).
 Drive end-to-end flows through `LaneModel` with the real `ProviderRegistry.default`.
 **Async-load timing trap:** an item's `run` closure executes in a detached `Task`, so state doesn't change synchronously after `activateSelected()`/`confirm()`/`drillRight()` — poll before asserting (`model.isInputMode`, `currentLevel?.isLoading == false`, `.indexBuilt == true`, or `breadcrumb.last == <title> && currentLevel?.isLoading == false` for a drill-in).
-The SwiftUI views, AppleScript controllers (Chrome/iTerm), the global hotkey, and the draggable/positioned panel cannot be tested headlessly — verify those by running the app.
+The SwiftUI views, the Chrome AppleScript controller, the global hotkey, and the draggable/positioned panel cannot be tested headlessly — verify those by running the app.
 
 ## Project structure mechanics
 
@@ -116,7 +116,8 @@ Four layers, nothing below couples to anything above:
   `ScriptItemsProvider` (section 4) contributes the lane-level ones; `RepositoryProvider` appends the `repository/` ones to each repo's actions.
   The launchers — Open PR (Chrome tab-focus), Open Terminal here, the agents (Claude/opencode), and the editor/Finder/CI tools (Fork, Android Studio, VS Code, Finder, GitHub Actions) — are **not** built-in; they ship in the default catalog (`lanes-catalog-default`) as drop-in scripts that reproduce the tagged-iTerm reuse / Chrome tab-focus in plain `osascript` (the Apple Event is sent by a Lanes-spawned child, so it inherits Lanes' Automation grant).
   `RepositoryProvider` therefore contributes only the repo containers (subtitle = branch) whose children are the `repository/` scripts; there is no longer a `FolderProvider` or `AgentsProvider`.
-  `AppLauncher.open(app:path:)` is consequently unused by the UI but kept as service API (`reveal` is still used by lane management); `ITermController`/`HostResolver` are likewise unused by providers now but kept as services.
+  Because those launchers moved into the catalog, the code that used to reproduce them in-app is gone: `ITermController` and the git-host URL builders (`HostResolver`/`HostAdapter`/`GitHubHost`…) were removed, and `AppLauncher` keeps only `reveal` (lane management still reveals in Finder).
+  `ChromeController.focusOrOpen` remains, used by `TicketProvider` to focus/open a ticket tab.
 - **Clone repo** — `CloneRepoProvider` (section 2) shows one "Clone repo…" container whose children are the root's **known repos** (`RepoRegistry`, persisted per-root at `<root>/.lanes/repos.json`), so a fresh lane can search-and-clone a repo used before; `SubtreeIndex`'s child indexing makes them reachable by name from the lane's top level.
   The list is **auto-harvested**: `RepositoryProvider` records each discovered repo's raw `origin` URL (via `GitInspector.remoteURL`) through `RepoRegistry.harvest` (deduped by canonical `host/owner/slug`, ssh+https collapse).
   The container's **search field doubles as a URL field**: when the query matches no known repo but looks like a clone target (`CloneRepoProvider.looksLikeCloneTarget` — contains `/`, `:`, or `@`), the level's `queryFallback` (a generic `Item`/`LevelState` hook consulted by `LaneModel.itemRows` when a search returns no hits) yields a "Clone <repo>" action. There's no separate "add" step.
@@ -137,7 +138,7 @@ Four layers, nothing below couples to anything above:
 - **LaneProvider** (`Providers/`) — statically registered in `ProviderRegistry.default`, ordered by `section`.
   Each owns its entire subtree.
   `ItemLoader` runs them concurrently in a `TaskGroup` with a per-provider 3s timeout, streaming results that `LaneModel` merges by `(section, title)`.
-- **Services** (`Services/`) — every side effect (Shell, GitInspector, Host adapters, Chrome/iTerm AppleScript controllers, AppLauncher), injected into providers.
+- **Services** (`Services/`) — every side effect (Shell, GitInspector, the Chrome AppleScript controller, AppLauncher), injected into providers.
   `KeepAwake` (also in `Services/`, so `LaneModel` stays harness-compilable) is a `@MainActor ObservableObject` wrapping a `ProcessInfo` activity (`.idleSystemSleepDisabled`) that prevents idle *system* sleep while active (display may still sleep); owned by `AppCore`, off at launch. Toggled from the menu bar ("Keep system awake", which checks the item + adds a small monochrome `bolt.fill` badge to the status icon) and **⌘K while the panel is open** (`PanelController` → `LaneModel.toggleKeepAwake`); while active, `RootView` shows an informational banner (with a "Turn Off") at any depth. `LaneModel` observes `KeepAwake` so the banner reflects toggles from any source.
 
 `LaneModel` (`UI/LaneModel.swift`) is the navigation brain: a `stack` of levels (level 0 = lane list is implicit/empty stack), `query`, `selection`.
@@ -159,8 +160,8 @@ Four layers, nothing below couples to anything above:
 - **Panel show uses `reopen()`, not `reset()`.**
   `reset()` hard-resets to the lane list; `reopen()` keeps the in-memory navigation stack so the ⌥Space hotkey returns you where you left off (a process restart starts empty = root).
   `reopen()` refreshes the root list and falls back to `reset()` if the lane you were in vanished on disk.
-- **AppleScript lives only in `ChromeController` / `ITermController`** as escaped string templates — treat those scripts as load-bearing and don't paraphrase them.
-  iTerm sessions are tagged by name with the sentinel `«lane:<laneID>:<tag>»`; keep it stable.
+- **AppleScript lives only in `ChromeController`** as an escaped string template — treat that script as load-bearing and don't paraphrase it.
+  (The terminal-reuse AppleScript now ships in the default catalog's scripts, not in-app.)
   Error `-1743` maps to `AutomationError.notAuthorized`.
 - **No sandbox** (`ENABLE_APP_SANDBOX = NO`) — the app runs `git` and drives other apps via Apple Events.
   Bundle id `at.xa1.lanes` must stay stable (TCC Automation grants are tied to it).

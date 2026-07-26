@@ -33,11 +33,6 @@ nonisolated struct ChromeController: Sendable {
         }
     }
 
-    @discardableResult
-    func openInChrome(url: URL) throws -> String {
-        try focusOrOpen(urlContaining: url.absoluteString, fallback: url)
-    }
-
     // Verbatim from the spec (§7).
     private static let script = """
     tell application "Google Chrome"

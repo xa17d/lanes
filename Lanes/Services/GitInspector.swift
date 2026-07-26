@@ -12,8 +12,6 @@ nonisolated struct GitRemote: Sendable, Equatable {
     let owner: String   // may include a subgroup path for GitLab
     let slug: String
 
-    var webBase: URL { URL(string: "https://\(host)/\(owner)/\(slug)")! }
-
     /// Parse the common remote URL forms. Returns nil if unrecognized.
     ///   git@github.com:owner/repo.git
     ///   https://github.com/owner/repo(.git)
@@ -92,10 +90,6 @@ nonisolated struct GitInspector: Sendable {
             }
         }
         return name.isEmpty ? nil : name
-    }
-
-    func remote(of repo: URL) -> GitRemote? {
-        remoteURL(of: repo).flatMap(GitRemote.parse)
     }
 
     /// The raw `origin` URL as configured (unparsed), so the exact clone form —
