@@ -271,7 +271,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = at.xa1.lanes;
 				PRODUCT_NAME = Lanes;
 				REGISTER_APP_GROUPS = YES;
@@ -304,7 +304,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = at.xa1.lanes;
 				PRODUCT_NAME = Lanes;
 				REGISTER_APP_GROUPS = YES;

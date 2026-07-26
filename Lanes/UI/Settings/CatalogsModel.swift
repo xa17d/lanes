@@ -218,14 +218,16 @@ nonisolated enum ConfigEdits {
     }
 
     /// Enable a small curated starter set from the default catalog, so the
-    /// launcher is useful immediately after auto-subscribing.
+    /// launcher is useful immediately after auto-subscribing. The terminal and
+    /// agent default to the Ghostty variants; users can swap in the iTerm2 /
+    /// Terminal.app equivalents from the Catalogs editor.
     static func enableStarterSet(catalog id: String, root: URL) {
         let lane = LaneFS.scriptDir(in: root)
         let repo = LaneFS.repoScriptDir(in: root)
-        for item in ["script/open-terminal", "script/claude"] {
+        for item in ["script/open-terminal-ghostty", "script/claude-ghostty"] {
             enable(catalog: id, item: item, in: lane, root: root)
         }
-        for item in ["script/repository/open-pr", "script/repository/open-terminal",
+        for item in ["script/repository/open-pr", "script/repository/open-terminal-ghostty",
                      "script/repository/copy-branch", "script/repository/open-repo-in-browser"] {
             enable(catalog: id, item: item, in: repo, root: root)
         }
