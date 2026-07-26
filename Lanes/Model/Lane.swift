@@ -23,6 +23,21 @@ nonisolated struct Lane: Identifiable, Hashable, Sendable {
             && parent.deletingLastPathComponent().lastPathComponent == LaneFS.lanesDirName
     }
     var dotLane: URL { url.appendingPathComponent(".lane", isDirectory: true) }
+
+    /// The base environment every lane script/hook runs with. Callers layer
+    /// their own vars on top (a linked ticket's `TICKET_*`, a repo's `REPO_*`).
+    var scriptEnv: [String: String] {
+        ["LANE_DIR": url.path, "LANE_NAME": name, "LANE_ID": id.uuidString]
+    }
+}
+
+nonisolated extension Lane {
+    /// Build a lane from its folder location and loaded meta — the single mapping
+    /// used by every `LaneFS` op that returns a `Lane`.
+    init(url: URL, meta: LaneMeta) {
+        self.init(url: url, id: meta.id, createdAt: meta.createdAt,
+                  lastOpenedAt: meta.lastOpenedAt, summary: meta.summary)
+    }
 }
 
 /// Contents of `.lane/lane.json`.

@@ -145,9 +145,7 @@ nonisolated enum LaneFS {
     }
 
     private static func lane(at url: URL) throws -> Lane {
-        let meta = try loadOrCreateMeta(at: url)
-        return Lane(url: url, id: meta.id, createdAt: meta.createdAt,
-                    lastOpenedAt: meta.lastOpenedAt, summary: meta.summary)
+        Lane(url: url, meta: try loadOrCreateMeta(at: url))
     }
 
     // MARK: - Listing
@@ -200,8 +198,7 @@ nonisolated enum LaneFS {
         var meta = try loadOrCreateMeta(at: lane.url)
         meta.lastOpenedAt = now
         try JSONFile.writeAtomic(meta, to: metaURL(for: lane.url))
-        return Lane(url: lane.url, id: meta.id, createdAt: meta.createdAt,
-                    lastOpenedAt: now, summary: meta.summary)
+        return Lane(url: lane.url, meta: meta)
     }
 
     /// Set (or clear) the lane's one-line description. Returns the updated lane.
@@ -210,8 +207,7 @@ nonisolated enum LaneFS {
         let trimmed = summary.trimmingCharacters(in: .whitespacesAndNewlines)
         meta.summary = trimmed.isEmpty ? nil : trimmed
         try JSONFile.writeAtomic(meta, to: metaURL(for: lane.url))
-        return Lane(url: lane.url, id: meta.id, createdAt: meta.createdAt,
-                    lastOpenedAt: meta.lastOpenedAt, summary: meta.summary)
+        return Lane(url: lane.url, meta: meta)
     }
 
     static func archive(_ lane: Lane, in root: URL) throws -> Lane {

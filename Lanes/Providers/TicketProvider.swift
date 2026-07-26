@@ -18,6 +18,9 @@ nonisolated struct TicketLink: Codable, Sendable {
 nonisolated struct TicketEnv: Sendable {
     let key: String
     let url: String   // empty when there's no override and no base URL
+
+    /// The `TICKET_*` vars to layer onto a lane's base `scriptEnv`.
+    var vars: [String: String] { ["TICKET_KEY": key, "TICKET_URL": url] }
 }
 
 nonisolated struct TicketProvider: LaneProvider {

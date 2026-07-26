@@ -36,13 +36,10 @@ nonisolated struct RepoCloner: Sendable {
         guard !FileManager.default.fileExists(atPath: dest.path) else {
             throw InputError(message: "“\(repo.name)” already exists in this lane.")
         }
-        let env = [
-            "LANE_DIR": lane.url.path,
-            "LANE_NAME": lane.name,
-            "LANE_ID": lane.id.uuidString,
+        let env = lane.scriptEnv.merging([
             "REPO_URL": repo.url,
             "REPO_NAME": repo.name,
-        ]
+        ]) { _, new in new }
         do {
             if let handler = Self.handler(root: root) {
                 try shell.run(handler.path, [], cwd: lane.url, env: env)

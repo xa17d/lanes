@@ -77,12 +77,7 @@ nonisolated struct LaneHooks: Sendable {
     func cleanup(_ lane: Lane, root: URL) {
         guard hookExists(Self.cleanupHook, root: root) else { return }
         let store = LaneStore(lane: lane)
-        var env = laneEnv(lane)
-        if let ticket = TicketProvider.primaryEnv(store: store, baseURL: baseURL) {
-            env["TICKET_KEY"] = ticket.key
-            env["TICKET_URL"] = ticket.url
-        }
-        _ = stdout(of: Self.cleanupHook, for: lane, root: root, env: env)
+        _ = stdout(of: Self.cleanupHook, for: lane, root: root, env: laneEnv(lane, store: store))
     }
 
     // MARK: - Individual hooks
@@ -102,7 +97,8 @@ nonisolated struct LaneHooks: Sendable {
     /// `extract-ticket`: treat its trimmed stdout as a ticket key and link it to
     /// the lane (idempotent — re-running never duplicates the ticket).
     private func extractTicket(for lane: Lane, root: URL, store: LaneStore) {
-        guard let key = stdout(of: Self.ticketHook, for: lane, root: root, env: laneEnv(lane))
+        // Base env only: extract-ticket runs before any ticket is known.
+        guard let key = stdout(of: Self.ticketHook, for: lane, root: root, env: lane.scriptEnv)
         else { return }
         _ = try? TicketProvider.link(key: key, store: store)
     }
@@ -110,18 +106,16 @@ nonisolated struct LaneHooks: Sendable {
     /// `update-lane-description`: its trimmed stdout becomes the description,
     /// with the lane's primary ticket exported as TICKET_KEY/TICKET_URL.
     private func runDescription(for lane: Lane, root: URL, store: LaneStore) -> String? {
-        var env = laneEnv(lane)
-        if let ticket = TicketProvider.primaryEnv(store: store, baseURL: baseURL) {
-            env["TICKET_KEY"] = ticket.key
-            env["TICKET_URL"] = ticket.url
-        }
-        return stdout(of: Self.descriptionHook, for: lane, root: root, env: env)
+        stdout(of: Self.descriptionHook, for: lane, root: root, env: laneEnv(lane, store: store))
     }
 
     // MARK: - Internals
 
-    private func laneEnv(_ lane: Lane) -> [String: String] {
-        ["LANE_DIR": lane.url.path, "LANE_NAME": lane.name, "LANE_ID": lane.id.uuidString]
+    /// The lane's script env with its primary ticket's `TICKET_*` layered on
+    /// (when one is linked), so a hook can reference the just-extracted ticket.
+    private func laneEnv(_ lane: Lane, store: LaneStore) -> [String: String] {
+        let ticket = TicketProvider.primaryEnv(store: store, baseURL: baseURL)
+        return lane.scriptEnv.merging(ticket?.vars ?? [:]) { _, new in new }
     }
 
     /// The effective executable for hook `name`: a `<name>.catalog` pointer wins

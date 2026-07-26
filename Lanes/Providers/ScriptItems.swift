@@ -129,12 +129,7 @@ nonisolated struct ScriptItems: Sendable {
     // MARK: - Internals
 
     private static func laneEnv(for lane: Lane, ticket: TicketEnv?) -> [String: String] {
-        var env = ["LANE_DIR": lane.url.path, "LANE_NAME": lane.name, "LANE_ID": lane.id.uuidString]
-        if let ticket {
-            env["TICKET_KEY"] = ticket.key
-            env["TICKET_URL"] = ticket.url
-        }
-        return env
+        lane.scriptEnv.merging(ticket?.vars ?? [:]) { _, new in new }
     }
 
     private func item(id: String, script: EffectiveScript, cwd: URL, env: [String: String]) -> any Item {
