@@ -66,12 +66,16 @@ nonisolated struct DescriptionMarkup: Sendable, Equatable {
     }
 
     /// Text a query should match against: the body plus the badge label.
-    static func searchText(from raw: String?) -> String {
-        let parsed = parse(from: raw)
-        return [parsed.body, parsed.badge?.text]
+    var searchText: String {
+        [body, badge?.text]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+    }
+
+    /// Convenience: parse `raw` and return its search text in one step.
+    static func searchText(from raw: String?) -> String {
+        parse(from: raw).searchText
     }
 
     // MARK: - Helpers

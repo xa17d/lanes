@@ -162,28 +162,32 @@ final class LaneModel: ObservableObject {
     }
 
     private func laneRows() -> [DisplayRow] {
-        let matched: [Lane]
+        // Parse each lane's description markup once, then reuse it for both
+        // scoring (body + badge text) and the row's display/badge.
+        let parsed = lanes.map { (lane: $0, markup: DescriptionMarkup.parse(from: $0.summary)) }
+        let matched: [(lane: Lane, markup: DescriptionMarkup)]
         if query.isEmpty {
-            matched = lanes
+            matched = parsed
         } else {
-            matched = lanes
-                .compactMap { t -> (Lane, Double)? in
+            matched = parsed
+                .compactMap { entry -> (lane: Lane, markup: DescriptionMarkup, score: Double)? in
                     // Match against the folder name and the description body +
                     // status text; keep the best score.
-                    let nameScore = FuzzyMatcher.score(query: query, title: t.name)
-                    let descScore = FuzzyMatcher.score(query, DescriptionMarkup.searchText(from: t.summary))
+                    let nameScore = FuzzyMatcher.score(query: query, title: entry.lane.name)
+                    let descScore = FuzzyMatcher.score(query, entry.markup.searchText)
                     guard let best = [nameScore, descScore].compactMap({ $0 }).max() else { return nil }
-                    return (t, best)
+                    return (entry.lane, entry.markup, best)
                 }
-                .sorted { $0.1 > $1.1 }
-                .map(\.0)
+                .sorted { $0.score > $1.score }
+                .map { (lane: $0.lane, markup: $0.markup) }
         }
-        var rows = matched.map { t -> DisplayRow in
+        var rows = matched.map { entry -> DisplayRow in
             // Description big, folder name smaller below; the status badge (if
             // any) is parsed out of the description.
-            let parsed = DescriptionMarkup.parse(from: t.summary)
-            let hasBody = !parsed.body.isEmpty
-            let title = hasBody ? parsed.body : t.name
+            let t = entry.lane
+            let markup = entry.markup
+            let hasBody = !markup.body.isEmpty
+            let title = hasBody ? markup.body : t.name
             let subtitle: String?
             if hasBody {
                 subtitle = t.isArchived ? "\(t.name) · archived" : t.name
@@ -191,7 +195,7 @@ final class LaneModel: ObservableObject {
                 subtitle = t.isArchived ? "archived" : nil
             }
             return DisplayRow(id: "lane:\(t.id)", title: title, subtitle: subtitle,
-                              icon: .folder, pathLabels: [], badge: parsed.badge,
+                              icon: .folder, pathLabels: [], badge: markup.badge,
                               payload: .lane(t))
         }
         // "New lane…" is always last.
@@ -252,16 +256,10 @@ final class LaneModel: ObservableObject {
         }
     }
 
-    /// Right arrow: enter a lane or a container. (Management lives inside the
-    /// lane as the "Manage lane…" item, so → on a lane behaves like Enter
-    /// rather than opening a separate menu.)
-    func drillRight() {
-        guard let row = selectedRow else { return }
-        switch row.payload {
-        case .lane(let t): enter(lane: t)
-        case .item(let item): activate(item: item)
-        }
-    }
+    /// Right arrow: enter a lane or a container — identical to activating the
+    /// selection. (Management lives inside the lane as the "Manage lane…" item,
+    /// so → on a lane behaves like Enter rather than opening a separate menu.)
+    func drillRight() { activateSelected() }
 
     /// ⌃U: clear the active text field (the search query, or the input field in
     /// input mode) — like clearing the line in a terminal.
@@ -304,10 +302,21 @@ final class LaneModel: ObservableObject {
             reloadLanes()
         } else if let level = stack.last {
             if let source = level.sourceItem {
-                load(children: source, intoLevel: level.id)
-            } else {
-                loadLaneLevel(levelID: level.id)
+                loadLevel(level.id, from: .children(source), keepVisible: false)
+            } else if let lane = currentLane {
+                loadLevel(level.id, from: .lane(lane), keepVisible: false)
             }
+        }
+    }
+
+    /// Reload the current level's items *without* blanking the visible list, so
+    /// the list never flashes empty (⌘R on the open lane, post-clone reload).
+    private func reloadCurrentInPlace() {
+        guard let level = stack.last else { return }
+        if let source = level.sourceItem {
+            loadLevel(level.id, from: .children(source), keepVisible: true)
+        } else if let lane = currentLane {
+            loadLevel(level.id, from: .lane(lane), keepVisible: true)
         }
     }
 
@@ -508,7 +517,7 @@ final class LaneModel: ObservableObject {
         stack = [level]
         query = ""
         selection = 0
-        loadLaneLevel(levelID: level.id)
+        loadLevel(level.id, from: .lane(touched), keepVisible: false)
         kickStaleRefresh(touched)
     }
 
@@ -521,59 +530,76 @@ final class LaneModel: ObservableObject {
         stack.append(level)
         query = ""
         selection = 0
-        load(children: item, intoLevel: level.id)
+        loadLevel(level.id, from: .children(item), keepVisible: false)
     }
 
     // MARK: - Loading
 
-    private func loadLaneLevel(levelID: UUID) {
-        guard let lane = currentLane else { return }
-        let token = UUID()
-        mutate(levelID) { $0.loadToken = token; $0.isLoading = true; $0.items = []; $0.providerResults = []; $0.indexBuilt = false }
-        let store = LaneStore(lane: lane)
-        let providers = registry.providers
-        let services = services
-        Task {
-            let stream = ItemLoader.load(lane: lane, store: store, services: services, providers: providers)
-            var timedOut: [String] = []
-            for await result in stream {
-                guard isCurrentToken(levelID, token) else { return }
-                if result.timedOut { timedOut.append(result.displayName) }
-                mutate(levelID) {
-                    $0.providerResults.append(result)
-                    $0.items = LaneModel.merge($0.providerResults)
-                }
-            }
-            guard isCurrentToken(levelID, token) else { return }
-            mutate(levelID) { $0.isLoading = false }
-            if !timedOut.isEmpty {
-                showToast("\(timedOut.joined(separator: ", ")) timed out", kind: .error)
-            }
-            await buildIndex(levelID: levelID, token: token)
-        }
+    /// Where a level's items come from: a lane's providers (top level) or a
+    /// container item's children.
+    private enum LevelSource {
+        case lane(Lane)
+        case children(any Item)
     }
 
-    /// Reload the current level's items *without* blanking the visible list:
-    /// supersede any in-flight load, load fresh into a buffer, and swap the
-    /// items in atomically when ready. Used by ⌘R so the list never flashes
-    /// empty (unlike `loadLaneLevel`/`load(children:)`, which clear + shimmer).
-    private func reloadCurrentInPlace() {
-        guard let level = stack.last else { return }
-        let levelID = level.id
+    /// The one routine that fills a level's items, superseding any in-flight load
+    /// via a fresh token.
+    ///
+    /// `keepVisible == false` (a fresh open / drill / ⌘R on a lane list level):
+    /// show the loading state — set `isLoading`, and for a lane clear the items
+    /// so the shimmer shows and provider results stream in **progressively**.
+    ///
+    /// `keepVisible == true` (⌘R on the open lane, post-clone reload): keep the
+    /// current items on screen and swap the fresh set in **atomically** when it's
+    /// ready, so the list never flashes empty.
+    private func loadLevel(_ levelID: UUID, from source: LevelSource, keepVisible: Bool) {
         let token = UUID()
-        mutate(levelID) { $0.loadToken = token }   // supersede in-flight loads; keep items
-        if let source = level.sourceItem {
+        mutate(levelID) {
+            $0.loadToken = token
+            $0.indexBuilt = false
+            if !keepVisible {
+                $0.isLoading = true
+                if case .lane = source { $0.items = []; $0.providerResults = [] }
+            }
+        }
+        switch source {
+        case .children(let item):
             Task {
-                let kids = await source.children()
+                let kids = await item.children()
                 guard isCurrentToken(levelID, token) else { return }
                 mutate(levelID) { $0.items = kids; $0.isLoading = false }
                 await buildIndex(levelID: levelID, token: token)
             }
-        } else if let lane = currentLane {
-            let store = LaneStore(lane: lane)
-            let providers = registry.providers
-            let services = services
-            Task {
+        case .lane(let lane):
+            loadLaneProviders(levelID, lane: lane, token: token, progressive: !keepVisible)
+        }
+    }
+
+    /// Run the lane's providers into `levelID`. `progressive` streams each
+    /// contribution in as it returns (fresh load, with the timeout toast);
+    /// otherwise all results are collected and swapped in one mutation (no
+    /// flicker on an in-place reload).
+    private func loadLaneProviders(_ levelID: UUID, lane: Lane, token: UUID, progressive: Bool) {
+        let store = LaneStore(lane: lane)
+        let providers = registry.providers
+        let services = services
+        Task {
+            if progressive {
+                var timedOut: [String] = []
+                for await result in ItemLoader.load(lane: lane, store: store, services: services, providers: providers) {
+                    guard isCurrentToken(levelID, token) else { return }
+                    if result.timedOut { timedOut.append(result.displayName) }
+                    mutate(levelID) {
+                        $0.providerResults.append(result)
+                        $0.items = LaneModel.merge($0.providerResults)
+                    }
+                }
+                guard isCurrentToken(levelID, token) else { return }
+                mutate(levelID) { $0.isLoading = false }
+                if !timedOut.isEmpty {
+                    showToast("\(timedOut.joined(separator: ", ")) timed out", kind: .error)
+                }
+            } else {
                 var collected: [ProviderResult] = []
                 for await result in ItemLoader.load(lane: lane, store: store, services: services, providers: providers) {
                     guard isCurrentToken(levelID, token) else { return }
@@ -585,18 +611,7 @@ final class LaneModel: ObservableObject {
                     $0.items = LaneModel.merge(collected)
                     $0.isLoading = false
                 }
-                await buildIndex(levelID: levelID, token: token)
             }
-        }
-    }
-
-    private func load(children item: any Item, intoLevel levelID: UUID) {
-        let token = UUID()
-        mutate(levelID) { $0.loadToken = token; $0.isLoading = true; $0.indexBuilt = false }
-        Task {
-            let kids = await item.children()
-            guard isCurrentToken(levelID, token) else { return }
-            mutate(levelID) { $0.items = kids; $0.isLoading = false }
             await buildIndex(levelID: levelID, token: token)
         }
     }
