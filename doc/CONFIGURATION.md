@@ -95,11 +95,15 @@ Scripts inherit your environment (so `PATH` etc. are intact) plus:
 | `LANE_ID`     | ✅ lane UUID        | ✅ |
 | `TICKET_KEY`  | ✅ primary linked ticket key (e.g. `PROJ-123`) | ✅ |
 | `TICKET_URL`  | ✅ that ticket's URL | ✅ |
+| `TICKET_KEYS` | ✅ all linked ticket keys, newline-separated | ✅ |
+| `TICKET_URLS` | ✅ all linked ticket URLs, newline-separated | ✅ |
 | `REPO_DIR`    | —               | ✅ repository folder path |
 | `REPO_NAME`   | —               | ✅ repository folder name  |
 
 `TICKET_KEY`/`TICKET_URL` describe the lane's **first** linked ticket and are **unset** when the lane has none (guard with `${TICKET_KEY:-}`).
 `TICKET_URL` is empty if the ticket has no explicit URL and no base URL is configured in Settings.
+`TICKET_KEYS`/`TICKET_URLS` list **every** linked ticket (primary first), one per line and index-aligned so line N of each matches; they're likewise unset when the lane has no ticket.
+Iterate them with `while IFS= read -r key; do …; done <<< "$TICKET_KEYS"`.
 
 ### Example
 

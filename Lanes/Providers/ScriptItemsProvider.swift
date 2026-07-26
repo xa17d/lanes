@@ -16,7 +16,7 @@ nonisolated struct ScriptItemsProvider: LaneProvider {
 
     func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
         let root = LaneActions.root(of: lane)
-        let ticket = TicketProvider.primaryEnv(store: store, baseURL: services.ticketBaseURL)
+        let ticket = TicketProvider.env(store: store, baseURL: services.ticketBaseURL)
         return services.scripts.laneItems(root: root, lane: lane, ticket: ticket)
     }
 }

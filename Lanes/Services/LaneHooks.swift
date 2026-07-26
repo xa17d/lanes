@@ -68,7 +68,8 @@ nonisolated struct LaneHooks: Sendable {
     /// the lane's windows — its tagged iTerm/Claude sessions, the Fork window,
     /// matching Chrome tabs — while the lane folder still exists. The hook gets
     /// `LANE_DIR`/`LANE_NAME`/`LANE_ID` and, when a ticket is linked, the
-    /// lane's `TICKET_KEY`/`TICKET_URL` so it can match windows/tabs.
+    /// lane's `TICKET_KEY`/`TICKET_URL` (+ `TICKET_KEYS`/`TICKET_URLS`) so it can
+    /// match windows/tabs.
     ///
     /// A missing hook, a failure, or a non-zero exit is a no-op: the caller
     /// always proceeds with the archive/delete. Runs synchronously so windows
@@ -114,7 +115,7 @@ nonisolated struct LaneHooks: Sendable {
     /// The lane's script env with its primary ticket's `TICKET_*` layered on
     /// (when one is linked), so a hook can reference the just-extracted ticket.
     private func laneEnv(_ lane: Lane, store: LaneStore) -> [String: String] {
-        let ticket = TicketProvider.primaryEnv(store: store, baseURL: baseURL)
+        let ticket = TicketProvider.env(store: store, baseURL: baseURL)
         return lane.scriptEnv.merging(ticket?.vars ?? [:]) { _, new in new }
     }
 

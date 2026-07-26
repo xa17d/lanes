@@ -16,13 +16,31 @@ nonisolated struct TicketLink: Codable, Sendable {
     let urlOverride: URL?
 }
 
-/// A lane's ticket resolved for script consumption (`TICKET_KEY`/`TICKET_URL`).
+/// A lane's tickets resolved for script consumption. `key`/`url` are the
+/// primary (first) ticket for the common single-ticket case; `keys`/`urls` are
+/// every linked ticket (primary first), index-aligned so line N of one matches
+/// line N of the other.
 nonisolated struct TicketEnv: Sendable {
     let key: String
-    let url: String   // empty when there's no override and no base URL
+    let url: String     // empty when there's no override and no base URL
+    let keys: [String]  // all linked ticket keys, primary first
+    let urls: [String]  // all linked ticket URLs (aligned with `keys`; "" when unresolvable)
 
-    /// The `TICKET_*` vars to layer onto a lane's base `scriptEnv`.
-    var vars: [String: String] { ["TICKET_KEY": key, "TICKET_URL": url] }
+    /// Separator for the list vars. Newline so a script can iterate them line by
+    /// line (`while read`) or `paste` keys against URLs.
+    static let listSeparator = "\n"
+
+    /// The `TICKET_*` vars to layer onto a lane's base `scriptEnv`:
+    /// `TICKET_KEY`/`TICKET_URL` (primary) plus `TICKET_KEYS`/`TICKET_URLS`
+    /// (all of them, newline-separated).
+    var vars: [String: String] {
+        [
+            "TICKET_KEY": key,
+            "TICKET_URL": url,
+            "TICKET_KEYS": keys.joined(separator: Self.listSeparator),
+            "TICKET_URLS": urls.joined(separator: Self.listSeparator),
+        ]
+    }
 }
 
 nonisolated struct TicketProvider: LaneProvider {
@@ -31,13 +49,18 @@ nonisolated struct TicketProvider: LaneProvider {
 
     private static let storeKey = "ticket"
 
-    /// The lane's primary (first) linked ticket, resolved for script env vars,
-    /// or nil when no ticket is linked. The URL mirrors the item's own logic:
-    /// an explicit override, else the configured base URL joined with the key.
-    static func primaryEnv(store: LaneStore, baseURL: @Sendable () -> URL?) -> TicketEnv? {
-        guard let link = (store.value([TicketLink].self, storeKey) ?? []).first else { return nil }
-        let url = link.urlOverride ?? baseURL()?.appendingPathComponent(link.key)
-        return TicketEnv(key: link.key, url: url?.absoluteString ?? "")
+    /// The lane's linked tickets resolved for script env vars, or nil when none
+    /// is linked. Each URL mirrors the item's own logic: an explicit override,
+    /// else the configured base URL joined with the key. The first link is the
+    /// primary (`TICKET_KEY`/`TICKET_URL`); all of them feed the list vars.
+    static func env(store: LaneStore, baseURL: @Sendable () -> URL?) -> TicketEnv? {
+        let links = store.value([TicketLink].self, storeKey) ?? []
+        guard let primary = links.first else { return nil }
+        func resolve(_ link: TicketLink) -> String {
+            (link.urlOverride ?? baseURL()?.appendingPathComponent(link.key))?.absoluteString ?? ""
+        }
+        return TicketEnv(key: primary.key, url: resolve(primary),
+                         keys: links.map(\.key), urls: links.map(resolve))
     }
 
     /// Link `key` to the lane unless it's already linked (idempotent upsert by

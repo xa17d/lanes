@@ -25,7 +25,7 @@ nonisolated struct RepositoryProvider: LaneProvider {
         let repoScripts = ScriptItems.effectiveScripts(
             in: LaneFS.repoScriptDir(in: root), root: root)
         let lane = lane
-        let ticket = TicketProvider.primaryEnv(store: store, baseURL: services.ticketBaseURL)
+        let ticket = TicketProvider.env(store: store, baseURL: services.ticketBaseURL)
 
         // Read branch + origin URL per-repo concurrently.
         let collected = await withTaskGroup(of: (Int, any Item, String?).self) { group in
