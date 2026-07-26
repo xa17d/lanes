@@ -36,10 +36,8 @@ nonisolated struct ScriptItems: Sendable {
         ) else { return [] }
         return entries
             .filter { url in
-                let name = url.lastPathComponent
-                if name.hasPrefix(".") || name.lowercased().hasPrefix("readme") { return false }
-                let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-                return isRegular && fm.isExecutableFile(atPath: url.path)
+                if url.isDotfileOrReadme { return false }
+                return url.isExecutableRegularFile
             }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
@@ -58,16 +56,14 @@ nonisolated struct ScriptItems: Sendable {
         ) else { return [] }
         var out: [EffectiveScript] = []
         for url in entries {
-            let name = url.lastPathComponent
-            if name.hasPrefix(".") || name.lowercased().hasPrefix("readme") { continue }
+            if url.isDotfileOrReadme { continue }
             if Catalogs.isPointer(url) {
                 if let target = Catalogs.resolveExecutable(at: url, root: root) {
                     out.append(EffectiveScript(display: url, exec: target))
                 }
                 continue
             }
-            let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-            if isRegular && fm.isExecutableFile(atPath: url.path) {
+            if url.isExecutableRegularFile {
                 out.append(EffectiveScript(display: url, exec: url))
             }
         }

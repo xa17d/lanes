@@ -78,8 +78,8 @@ nonisolated enum ConfigEdits {
                 at: dir, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
             ) else { return [] }
             return entries.compactMap { folder -> Available? in
+                if folder.isDotfileOrReadme { return nil }
                 let leaf = folder.lastPathComponent
-                if leaf.hasPrefix(".") || leaf.lowercased().hasPrefix("readme") { return nil }
                 if subdir == "script" && leaf == "repository" { return nil }   // reserved
                 let isDir = (try? folder.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
                 guard isDir else { return nil }
@@ -103,11 +103,8 @@ nonisolated enum ConfigEdits {
             at: dir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]
         ) else { return [] }
         let items: [LocalItem] = entries.compactMap { url -> LocalItem? in
-            let leaf = url.lastPathComponent
-            if leaf.hasPrefix(".") || leaf.lowercased().hasPrefix("readme") { return nil }
-            if Catalogs.isPointer(url) { return nil }
-            let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-            guard isRegular, fm.isExecutableFile(atPath: url.path) else { return nil }
+            if url.isDotfileOrReadme || Catalogs.isPointer(url) { return nil }
+            guard url.isExecutableRegularFile else { return nil }
             let parsed = parseFilename(url)
             return LocalItem(url: url, name: parsed.name, icon: parsed.icon)
         }
@@ -243,9 +240,7 @@ nonisolated enum ConfigEdits {
 
     /// Whether a local (non-pointer) executable hook named `name` exists.
     static func hasLocalHook(_ name: String, root: URL) -> Bool {
-        let url = LaneFS.hookDir(in: root).appendingPathComponent(name)
-        let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-        return isRegular && fm.isExecutableFile(atPath: url.path)
+        LaneFS.hookDir(in: root).appendingPathComponent(name).isExecutableRegularFile
     }
 
     static func setHookPointer(_ name: String, catalog: String, item: String, root: URL) throws {
@@ -290,9 +285,7 @@ nonisolated enum ConfigEdits {
 
     /// Whether a local (non-pointer) executable clone-repo handler exists.
     static func hasLocalCloneScript(root: URL) -> Bool {
-        let url = LaneFS.cloneScript(in: root)
-        let isRegular = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-        return isRegular && fm.isExecutableFile(atPath: url.path)
+        LaneFS.cloneScript(in: root).isExecutableRegularFile
     }
 
     // MARK: Internals

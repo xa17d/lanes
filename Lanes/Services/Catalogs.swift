@@ -156,9 +156,7 @@ nonisolated enum Catalogs {
             at: folder, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]
         ) else { return nil }
         return entries.first { url in
-            url.lastPathComponent != itemManifestFilename
-                && ((try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false)
-                && fm.isExecutableFile(atPath: url.path)
+            url.lastPathComponent != itemManifestFilename && url.isExecutableRegularFile
         }
     }
 

@@ -137,8 +137,7 @@ nonisolated struct LaneHooks: Sendable {
             return target
         }
         let local = dir.appendingPathComponent(name)
-        let isRegular = (try? local.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-        return (isRegular && fm.isExecutableFile(atPath: local.path)) ? local : nil
+        return local.isExecutableRegularFile ? local : nil
     }
 
     /// Whether hook `name` resolves to a runnable executable.

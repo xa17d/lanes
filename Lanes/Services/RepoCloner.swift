@@ -70,7 +70,6 @@ nonisolated struct RepoCloner: Sendable {
             return target
         }
         let local = LaneFS.cloneScript(in: root)
-        let isRegular = (try? local.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
-        return (isRegular && fm.isExecutableFile(atPath: local.path)) ? local : nil
+        return local.isExecutableRegularFile ? local : nil
     }
 }
