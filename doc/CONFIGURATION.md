@@ -137,6 +137,7 @@ The ssh and https forms of the same repo collapse into one entry.
 Because the list is indexed like everything else, typing a repo name from the lane's top level jumps straight to it (`Clone repo… › my-service`).
 
 Cloning (whether from the list or a pasted URL) drops the repo into `<lane>/<repo-name>`; an existing folder of that name is an error (Lanes never overwrites).
+Clones run **in the background**: you're returned to the lane immediately and the new repo shows a spinner until it's ready, so you can kick off several at once without waiting.
 
 ### Custom clone handler (optional)
 

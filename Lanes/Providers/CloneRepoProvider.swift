@@ -7,11 +7,12 @@
 //  cloned before and clone it here. Because SubtreeIndex indexes children, the
 //  repos are reachable by name straight from the lane's top level.
 //
-//  Selecting a repo clones it into the lane (hybrid: a `clone-repo` handler if
-//  configured, else `git clone`) and re-enters the lane so the new repo shows.
-//  The search field doubles as a URL field: a query that matches no known repo
-//  but parses as a clone URL becomes a "Clone <repo>" action (via the level's
-//  queryFallback), so the list fills itself purely from what you actually clone.
+//  Picking a repo (or the query fallback below) returns `.startClone`, which
+//  LaneModel runs as a background clone: the panel returns to the lane and shows
+//  a spinner row until the clone finishes, so several can run at once without
+//  blocking. The search field doubles as a URL field: a query that matches no
+//  known repo but looks like a clone target becomes a "Clone <repo>" action.
+//  The list fills itself from what you actually clone (LaneModel remembers it).
 //
 
 import Foundation
@@ -23,7 +24,6 @@ nonisolated struct CloneRepoProvider: LaneProvider {
     func items(for lane: Lane, store: LaneStore, services: Services) async -> [any Item] {
         let root = LaneActions.root(of: lane)
         let registry = RepoRegistry(root: root)
-        let cloner = RepoCloner(shell: services.shell)
 
         let container = BasicItem(
             id: "clone:container",
@@ -34,9 +34,7 @@ nonisolated struct CloneRepoProvider: LaneProvider {
             childrenProvider: {
                 // Read the registry live so a freshly cloned repo shows up when
                 // this level is reloaded.
-                registry.known().map { repo in
-                    Self.repoItem(repo, lane: lane, root: root, cloner: cloner, registry: registry)
-                }
+                registry.known().map { Self.repoItem($0, lane: lane) }
             },
             // The search field doubles as a URL field: an unmatched query that
             // looks like a clone target (a URL or path — not a bare-word typo)
@@ -51,7 +49,7 @@ nonisolated struct CloneRepoProvider: LaneProvider {
                     subtitle: q,
                     icon: .add,
                     keywords: ["clone", "url"],
-                    run: { try Self.performClone(repo, lane: lane, root: root, cloner: cloner, registry: registry) }
+                    run: { .startClone(lane: lane, url: repo.url) }
                 )
             }
         )
@@ -60,8 +58,7 @@ nonisolated struct CloneRepoProvider: LaneProvider {
 
     // MARK: - Items
 
-    private static func repoItem(_ repo: KnownRepo, lane: Lane, root: URL,
-                                 cloner: RepoCloner, registry: RepoRegistry) -> any Item {
+    private static func repoItem(_ repo: KnownRepo, lane: Lane) -> any Item {
         // A single stat (the exact clone-collision predicate) — no repo scan.
         let alreadyHere = FileManager.default.fileExists(
             atPath: lane.url.appendingPathComponent(repo.name).path)
@@ -76,7 +73,7 @@ nonisolated struct CloneRepoProvider: LaneProvider {
             subtitle: subtitle,
             icon: .repo,
             keywords: ["clone", "repo", "git", repo.owner, repo.host].compactMap { $0 },
-            run: { try performClone(repo, lane: lane, root: root, cloner: cloner, registry: registry) }
+            run: { .startClone(lane: lane, url: repo.url) }
         )
     }
 
@@ -87,21 +84,5 @@ nonisolated struct CloneRepoProvider: LaneProvider {
     static func looksLikeCloneTarget(_ q: String) -> Bool {
         guard !q.isEmpty else { return false }
         return q.contains("/") || q.contains(":") || q.contains("@")
-    }
-
-    /// Clone `repo` into `lane`, record it in the known-repos list, and re-enter
-    /// the lane so the new repo shows. A non-fatal warning (a non-zero exit that
-    /// still produced the repo) is surfaced but never blocks the refresh.
-    private static func performClone(_ repo: KnownRepo, lane: Lane, root: URL,
-                                     cloner: RepoCloner, registry: RepoRegistry) throws -> RunOutcome {
-        let outcome = try cloner.clone(repo, into: lane, root: root)
-        registry.remember(url: repo.url)
-        switch outcome {
-        case .cloned:
-            return .enter(lane)
-        case .clonedWithWarnings(let stderr):
-            let detail = stderr.isEmpty ? "" : "\n\(stderr)"
-            return .enterWithNotice(lane, notice: "Cloned “\(repo.name)” with warnings.\(detail)")
-        }
     }
 }

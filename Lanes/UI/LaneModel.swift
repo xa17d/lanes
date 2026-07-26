@@ -40,6 +40,10 @@ final class LaneModel: ObservableObject {
     /// panel shows a spinner instead of looking frozen.
     @Published private(set) var isRunningAction = false
 
+    /// Background clones in progress. Each shows a spinner row in its lane until
+    /// it finishes; multiple can run at once (clones never block the panel).
+    @Published private(set) var activeClones: [CloneJob] = []
+
     /// Lanes whose `{{refresh:…}}` hook is currently re-running, so frequent
     /// re-renders don't spawn duplicate runs for the same lane.
     private var refreshingLaneIDs: Set<Lane.ID> = []
@@ -148,11 +152,13 @@ final class LaneModel: ObservableObject {
 
     var rows: [DisplayRow] {
         if isInputMode { return [] }
-        if stack.isEmpty {
-            return laneRows()
-        } else {
-            return itemRows(for: stack[stack.count - 1])
+        if stack.isEmpty { return laneRows() }
+        let base = itemRows(for: stack[stack.count - 1])
+        // Overlay in-progress clone spinners at the lane's top level.
+        if stack.count == 1, query.isEmpty, let lane = currentLane {
+            return cloneRows(for: lane, existing: base) + base
         }
+        return base
     }
 
     private func laneRows() -> [DisplayRow] {
@@ -344,6 +350,69 @@ final class LaneModel: ObservableObject {
         if !stack.isEmpty, stack[0].lane?.id == lane.id { stack[0].lane = lane }
     }
 
+    // MARK: - Background clone
+
+    /// Start a non-blocking clone of `url` into `lane`. Registers a spinner job
+    /// (shown as a row in the lane until done), runs the clone off-main, and on
+    /// completion drops the job, surfaces any warning/error, and reloads the lane
+    /// in place if it's the one on screen — so several clones can run at once
+    /// without ever blocking the panel.
+    func startClone(url: String, into lane: Lane) {
+        guard let repo = RepoRegistry.makeRepo(url: url, now: Date()) else {
+            showToast("Not a recognizable clone URL.", kind: .error); return
+        }
+        // Skip if the destination already exists or the same clone is running.
+        if FileManager.default.fileExists(atPath: lane.url.appendingPathComponent(repo.name).path) {
+            showToast("“\(repo.name)” already exists in this lane.", kind: .error); return
+        }
+        if activeClones.contains(where: { $0.laneID == lane.id && $0.name == repo.name }) { return }
+
+        let job = CloneJob(laneID: lane.id, name: repo.name)
+        activeClones.append(job)
+        let root = LaneActions.root(of: lane)
+        let cloner = RepoCloner(shell: services.shell)
+        let registry = RepoRegistry(root: root)
+        Task.detached(priority: .userInitiated) {
+            var warning: String?
+            var failure: String?
+            do {
+                if case .clonedWithWarnings(let s) = try cloner.clone(repo, into: lane, root: root) { warning = s }
+                registry.remember(url: repo.url)
+            } catch {
+                failure = error.localizedDescription
+            }
+            await self.finishClone(job, name: repo.name, warning: warning, failure: failure)
+        }
+    }
+
+    private func finishClone(_ job: CloneJob, name: String, warning: String?, failure: String?) {
+        activeClones.removeAll { $0.id == job.id }
+        if let failure {
+            showToast("Couldn’t clone “\(name)”: \(failure)", kind: .error)
+        } else if let warning, !warning.isEmpty {
+            showToast("Cloned “\(name)” with warnings.\n\(warning)", kind: .error)
+        }
+        // If the lane is on screen, reload so the finished repo replaces its
+        // spinner row (the job removal already dropped the spinner).
+        if stack.count == 1, currentLane?.id == job.laneID {
+            reloadCurrentInPlace()
+        }
+    }
+
+    /// Spinner rows for the clones running into `lane`, minus any whose repo has
+    /// already surfaced in `existing` (so a mid-clone repo isn't shown twice).
+    private func cloneRows(for lane: Lane, existing: [DisplayRow]) -> [DisplayRow] {
+        let present = Set(existing.map(\.title))
+        return activeClones
+            .filter { $0.laneID == lane.id && !present.contains($0.name) }
+            .map { job in
+                DisplayRow(id: "cloning:\(job.id)", title: job.name, subtitle: "Cloning…",
+                           icon: .repo, pathLabels: [],
+                           payload: .item(BasicItem(id: "cloning:\(job.id)", title: job.name, run: { .stay })),
+                           isLoading: true)
+            }
+    }
+
     private func activate(item: any Item) {
         if let run = item.run {
             guard !isRunningAction else { return }   // ignore re-entry while one runs
@@ -393,6 +462,9 @@ final class LaneModel: ObservableObject {
         case .enterWithNotice(let lane, let notice):
             enter(lane: lane)
             showToast(notice, kind: .error)
+        case .startClone(let lane, let url):
+            startClone(url: url, into: lane)   // background; returns to the lane below
+            enter(lane: lane)
         case .pushInput(let request):
             pushInput(request, seed: seed)
         case .pushItems(let title, let items):
@@ -594,6 +666,8 @@ struct DisplayRow: Identifiable {
     let pathLabels: [String]
     let badge: StatusBadge?
     let payload: Payload
+    /// Shows a trailing spinner (e.g. a background clone in progress).
+    let isLoading: Bool
 
     enum Payload {
         case lane(Lane)
@@ -613,7 +687,8 @@ struct DisplayRow: Identifiable {
     }
 
     init(id: String, title: String, subtitle: String?, icon: IconToken,
-         pathLabels: [String], badge: StatusBadge? = nil, payload: Payload) {
+         pathLabels: [String], badge: StatusBadge? = nil, payload: Payload,
+         isLoading: Bool = false) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -621,6 +696,7 @@ struct DisplayRow: Identifiable {
         self.pathLabels = pathLabels
         self.badge = badge
         self.payload = payload
+        self.isLoading = isLoading
     }
 
     init(item: any Item, pathLabels: [String]) {
@@ -631,7 +707,15 @@ struct DisplayRow: Identifiable {
         self.pathLabels = pathLabels
         self.badge = nil
         self.payload = .item(item)
+        self.isLoading = false
     }
+}
+
+/// A background clone in progress, shown as a spinner row in its lane.
+struct CloneJob: Identifiable, Equatable {
+    let id = UUID()
+    let laneID: UUID
+    let name: String
 }
 
 struct ToastState: Identifiable, Equatable {

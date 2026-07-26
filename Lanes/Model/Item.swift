@@ -15,6 +15,7 @@ nonisolated enum RunOutcome: Sendable {
     case popToRoot                                 // pop to the lane list (after archive/rename/delete)
     case enter(Lane)                              // reset to level 0 and enter this lane
     case enterWithNotice(Lane, notice: String)     // enter this lane and surface a message (e.g. a clone that finished with warnings)
+    case startClone(lane: Lane, url: String)       // kick off a background clone into the lane and return to it (spinner row shown until done)
     case pushInput(InputRequest)                   // push a single-field input level
     case pushItems(title: String, items: [any Item])  // push a pre-built level (menus, confirms)
 }

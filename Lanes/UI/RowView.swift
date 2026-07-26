@@ -44,6 +44,12 @@ struct RowView: View {
                 StatusBadgeView(badge: badge)
             }
 
+            if row.isLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 16, height: 16)
+            }
+
             if row.isContainer {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
