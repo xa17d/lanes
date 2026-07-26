@@ -233,54 +233,47 @@ nonisolated enum ConfigEdits {
 
     // MARK: Hooks & template bindings
 
-    /// The pointer bound to hook `name`, if any.
-    static func hookPointer(_ name: String, root: URL) -> Catalogs.Pointer? {
-        JSONFile.read(Catalogs.Pointer.self, at: hookPointerURL(name, root: root))
+    /// A config slot bound to at most one catalog item through a single
+    /// `.catalog` pointer file — the hooks, the new-lane template, and the
+    /// clone-repo handler. Read / set / clear all target the one pointer URL, so
+    /// the three slot kinds share one implementation instead of a triplet each.
+    nonisolated struct SingletonSlot: Sendable {
+        let pointerURL: URL
+
+        /// The pointer currently bound to this slot, if any.
+        var pointer: Catalogs.Pointer? {
+            JSONFile.read(Catalogs.Pointer.self, at: pointerURL)
+        }
+
+        func set(catalog: String, item: String) throws {
+            try JSONFile.writeAtomic(Catalogs.Pointer(catalog: catalog, item: item), to: pointerURL)
+        }
+
+        func clear() throws {
+            let fm = FileManager.default
+            if fm.fileExists(atPath: pointerURL.path) { try fm.removeItem(at: pointerURL) }
+        }
+    }
+
+    /// The pointer slot for hook `name` (`hook/<name>.catalog`).
+    static func hookSlot(_ name: String, root: URL) -> SingletonSlot {
+        SingletonSlot(pointerURL: LaneFS.hookDir(in: root)
+            .appendingPathComponent("\(name).\(Catalogs.pointerExtension)"))
+    }
+
+    /// The pointer slot for the new-lane template.
+    static func templateSlot(root: URL) -> SingletonSlot {
+        SingletonSlot(pointerURL: LaneFS.templatePointer(in: root))
+    }
+
+    /// The pointer slot for the clone-repo handler.
+    static func cloneSlot(root: URL) -> SingletonSlot {
+        SingletonSlot(pointerURL: LaneFS.cloneScriptPointer(in: root))
     }
 
     /// Whether a local (non-pointer) executable hook named `name` exists.
     static func hasLocalHook(_ name: String, root: URL) -> Bool {
         LaneFS.hookDir(in: root).appendingPathComponent(name).isExecutableRegularFile
-    }
-
-    static func setHookPointer(_ name: String, catalog: String, item: String, root: URL) throws {
-        try writePointer(Catalogs.Pointer(catalog: catalog, item: item),
-                         to: hookPointerURL(name, root: root))
-    }
-
-    static func clearHookPointer(_ name: String, root: URL) throws {
-        let url = hookPointerURL(name, root: root)
-        if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
-    }
-
-    /// The pointer bound to the new-lane template, if any.
-    static func templatePointer(root: URL) -> Catalogs.Pointer? {
-        JSONFile.read(Catalogs.Pointer.self, at: LaneFS.templatePointer(in: root))
-    }
-
-    static func setTemplatePointer(catalog: String, item: String, root: URL) throws {
-        try writePointer(Catalogs.Pointer(catalog: catalog, item: item),
-                         to: LaneFS.templatePointer(in: root))
-    }
-
-    static func clearTemplatePointer(root: URL) throws {
-        let url = LaneFS.templatePointer(in: root)
-        if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
-    }
-
-    /// The pointer bound to the clone-repo handler, if any.
-    static func cloneScriptPointer(root: URL) -> Catalogs.Pointer? {
-        JSONFile.read(Catalogs.Pointer.self, at: LaneFS.cloneScriptPointer(in: root))
-    }
-
-    static func setCloneScriptPointer(catalog: String, item: String, root: URL) throws {
-        try writePointer(Catalogs.Pointer(catalog: catalog, item: item),
-                         to: LaneFS.cloneScriptPointer(in: root))
-    }
-
-    static func clearCloneScriptPointer(root: URL) throws {
-        let url = LaneFS.cloneScriptPointer(in: root)
-        if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
     }
 
     /// Whether a local (non-pointer) executable clone-repo handler exists.
@@ -289,10 +282,6 @@ nonisolated enum ConfigEdits {
     }
 
     // MARK: Internals
-
-    private static func hookPointerURL(_ name: String, root: URL) -> URL {
-        LaneFS.hookDir(in: root).appendingPathComponent("\(name).\(Catalogs.pointerExtension)")
-    }
 
     private static func writePointer(_ pointer: Catalogs.Pointer, to url: URL) throws {
         try JSONFile.writeAtomic(pointer, to: url)

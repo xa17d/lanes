@@ -311,14 +311,14 @@ struct HooksTab: View {
                              title: "\(item.name)  ·  \(model.name(for: item.catalog))",
                              detail: item.detail) {
                         selection.wrappedValue = k
-                        try? ConfigEdits.setHookPointer(name, catalog: item.catalog, item: item.item, root: root)
+                        try? ConfigEdits.hookSlot(name, root: root).set(catalog: item.catalog, item: item.item)
                     }
                 }
                 RadioRow(selected: selection.wrappedValue == nil,
                          title: "Local",
                          detail: "Uses the local \(name) hook, if any.") {
                     selection.wrappedValue = nil
-                    try? ConfigEdits.clearHookPointer(name, root: root)
+                    try? ConfigEdits.hookSlot(name, root: root).clear()
                 }
             }
         }
@@ -339,14 +339,14 @@ struct HooksTab: View {
                              title: "\(item.name)  ·  \(model.name(for: item.catalog))",
                              detail: item.detail) {
                         template = k
-                        try? ConfigEdits.setTemplatePointer(catalog: item.catalog, item: item.item, root: root)
+                        try? ConfigEdits.templateSlot(root: root).set(catalog: item.catalog, item: item.item)
                     }
                 }
                 RadioRow(selected: template == nil,
                          title: "Local",
                          detail: "Uses the local template/ folder, if any.") {
                     template = nil
-                    try? ConfigEdits.clearTemplatePointer(root: root)
+                    try? ConfigEdits.templateSlot(root: root).clear()
                 }
             }
         }
@@ -369,7 +369,7 @@ struct HooksTab: View {
                              title: "\(item.name)  ·  \(model.name(for: item.catalog))",
                              detail: item.detail) {
                         clone = k
-                        try? ConfigEdits.setCloneScriptPointer(catalog: item.catalog, item: item.item, root: root)
+                        try? ConfigEdits.cloneSlot(root: root).set(catalog: item.catalog, item: item.item)
                     }
                 }
                 RadioRow(selected: clone == nil,
@@ -377,7 +377,7 @@ struct HooksTab: View {
                          detail: hasLocal ? "Uses the local clone-repo handler."
                                           : "No handler — Lanes runs a plain git clone.") {
                     clone = nil
-                    try? ConfigEdits.clearCloneScriptPointer(root: root)
+                    try? ConfigEdits.cloneSlot(root: root).clear()
                 }
             }
         }
@@ -391,11 +391,11 @@ struct HooksTab: View {
     }
 
     private func reloadSelections() {
-        ticket = key(ConfigEdits.hookPointer(LaneHooks.ticketHook, root: root))
-        describe = key(ConfigEdits.hookPointer(LaneHooks.descriptionHook, root: root))
-        cleanup = key(ConfigEdits.hookPointer(LaneHooks.cleanupHook, root: root))
-        template = key(ConfigEdits.templatePointer(root: root))
-        clone = key(ConfigEdits.cloneScriptPointer(root: root))
+        ticket = key(ConfigEdits.hookSlot(LaneHooks.ticketHook, root: root).pointer)
+        describe = key(ConfigEdits.hookSlot(LaneHooks.descriptionHook, root: root).pointer)
+        cleanup = key(ConfigEdits.hookSlot(LaneHooks.cleanupHook, root: root).pointer)
+        template = key(ConfigEdits.templateSlot(root: root).pointer)
+        clone = key(ConfigEdits.cloneSlot(root: root).pointer)
     }
 
     private func key(_ pointer: Catalogs.Pointer?) -> String? {
