@@ -164,12 +164,14 @@ nonisolated enum LaneFS {
         }
     }
 
-    /// All lanes in `root`, sorted by lastOpenedAt desc (nil last), then name.
-    static func lanes(in root: URL, includeArchived: Bool = false) -> [Lane] {
-        var urls = childDirectories(of: root)
-        if includeArchived {
-            urls += childDirectories(of: archiveDir(in: root))
-        }
+    /// Lanes in `root`, sorted by lastOpenedAt desc (nil last), then name.
+    /// `archivedOnly` selects **only** the archived lanes (under `archive/`)
+    /// instead of the active ones — the list shows one set or the other, never
+    /// a mix, so archived lanes are a distinct view rather than extra rows.
+    static func lanes(in root: URL, archivedOnly: Bool = false) -> [Lane] {
+        let urls = archivedOnly
+            ? childDirectories(of: archiveDir(in: root))
+            : childDirectories(of: root)
         let loaded = urls.compactMap { try? lane(at: $0) }
         return loaded.sorted { a, b in
             switch (a.lastOpenedAt, b.lastOpenedAt) {

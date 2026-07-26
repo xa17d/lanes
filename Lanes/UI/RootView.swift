@@ -156,7 +156,7 @@ struct RootView: View {
             return "↵ confirm · esc cancel"
         }
         if model.stack.isEmpty {
-            let archived = model.includeArchived ? "⌘⇧A archived (shown)" : "⌘⇧A archived"
+            let archived = model.showArchived ? "⌘⇧A active" : "⌘⇧A archived"
             return "↑↓ navigate · ↵ open · ⌘N new · \(archived) · ⌘R refresh · ⌘K awake · esc close"
         }
         return "↑↓ navigate · ↵ open · ⌘R refresh · ⌘K awake · esc back · ⌘W close"

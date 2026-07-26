@@ -44,9 +44,9 @@ final class LaneLibrary: ObservableObject {
 
     // MARK: - CRUD (thin wrappers over LaneFS)
 
-    func lanes(includeArchived: Bool = false) -> [Lane] {
+    func lanes(archivedOnly: Bool = false) -> [Lane] {
         guard let root else { return [] }
-        return LaneFS.lanes(in: root, includeArchived: includeArchived)
+        return LaneFS.lanes(in: root, archivedOnly: archivedOnly)
     }
 
     func create(name: String) throws -> Lane {

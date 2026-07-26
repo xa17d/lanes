@@ -31,7 +31,7 @@ final class LaneModel: ObservableObject {
     @Published var inputText: String = ""
     @Published var selection: Int = 0
     @Published var toast: ToastState?
-    @Published var includeArchived = false
+    @Published var showArchived = false
     @Published var panelAppeared = false
     /// True while an explicit ⌘R refresh (hooks + reload) is running, so the UI
     /// can show a spinner. Not set by the passive {{refresh:…}} auto-refresh.
@@ -67,6 +67,7 @@ final class LaneModel: ObservableObject {
         stack = []
         query = ""
         selection = 0
+        showArchived = false   // a hard reset lands on the active-lanes view
         reloadLanes()
     }
 
@@ -90,7 +91,7 @@ final class LaneModel: ObservableObject {
     }
 
     func reloadLanes() {
-        lanes = library.lanes(includeArchived: includeArchived)
+        lanes = library.lanes(archivedOnly: showArchived)
         for lane in lanes { kickStaleRefresh(lane) }
         refreshCatalogIndicator()
     }
@@ -125,10 +126,11 @@ final class LaneModel: ObservableObject {
         }
     }
 
-    /// Toggle archived lanes in the level-0 list (so they can be unarchived).
+    /// Switch the level-0 list between active lanes and the archived-only view
+    /// (so archived lanes can be found and unarchived).
     func toggleArchived() {
         guard stack.isEmpty else { return }
-        includeArchived.toggle()
+        showArchived.toggle()
         selection = 0
         reloadLanes()
     }
@@ -195,11 +197,13 @@ final class LaneModel: ObservableObject {
                 subtitle = t.isArchived ? "archived" : nil
             }
             return DisplayRow(id: "lane:\(t.id)", title: title, subtitle: subtitle,
-                              icon: .folder, pathLabels: [], badge: markup.badge,
+                              icon: t.isArchived ? .archivedLane : .folder,
+                              pathLabels: [], badge: markup.badge,
                               payload: .lane(t))
         }
-        // "New lane…" is always last.
-        if let root = library.root {
+        // "New lane…" is always last — but not in the archived-only view, where
+        // creating a lane makes no sense.
+        if !showArchived, let root = library.root {
             let item = LaneActions.newLaneItem(root: root, hooks: services.hooks)
             rows.append(DisplayRow(item: item, pathLabels: []))
         }

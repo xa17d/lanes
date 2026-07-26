@@ -10,6 +10,7 @@ import Foundation
 
 nonisolated enum IconToken: Sendable, Hashable {
     case folder          // lane folder / finder
+    case archivedLane    // an archived lane in the level-0 list
     case ticket
     case repo
     case clone
@@ -38,6 +39,7 @@ nonisolated enum IconToken: Sendable, Hashable {
     var symbol: String {
         switch self {
         case .folder:       return "folder"
+        case .archivedLane: return "archivebox"
         case .ticket:       return "tag"
         case .repo:         return "chevron.left.forwardslash.chevron.right"
         case .clone:        return "square.and.arrow.down"
