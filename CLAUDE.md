@@ -25,6 +25,7 @@ Process them like this:
 - For each task: implement → review your own changes → test (build + `swiftc` harness for logic; run the app for UI/AppleScript/hotkey behavior) → iterate until the implementation both looks right and works.
 - Then **commit and push directly on `main`** (no PR/branch needed) before moving to the next task.
   End commit messages with the `Co-Authored-By` trailer.
+- **Bump the version for any user-facing change.** Increment `MARKETING_VERSION` (both the Debug and Release build configs in `Lanes.xcodeproj/project.pbxproj`) as part of the change — patch for fixes, minor for features. The version is surfaced in the UI (`AppInfo`, shown in the menu-bar menu and Settings › General › About), so it should always reflect what's shipped.
 
 ## Build & run
 

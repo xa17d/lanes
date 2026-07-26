@@ -129,6 +129,10 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("About") {
+                LabeledContent("Version", value: AppInfo.versionString)
+            }
         }
         .formStyle(.grouped)
         .onAppear { launchAtLogin = LoginItem.isEnabled }

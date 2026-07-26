@@ -37,6 +37,10 @@ final class StatusItemController: NSObject {
         }
 
         let menu = NSMenu()
+        let versionItem = NSMenuItem(title: "Lanes \(AppInfo.versionString)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        menu.addItem(versionItem)
+        menu.addItem(.separator())
         menu.addItem(menuItem("Open Lanes", #selector(toggle), key: ""))
         menu.addItem(.separator())
         let keepAwake = menuItem("Keep system awake", #selector(toggleKeepAwake), key: "")
